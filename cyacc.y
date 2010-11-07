@@ -1,7 +1,5 @@
 /* CYACC.Y		Yacc grammar for C	-*- Mode: Fundamental; Tab-width: 5 -*-
 
-	This code has been placed in the public domain.
-
 */
 
 %{

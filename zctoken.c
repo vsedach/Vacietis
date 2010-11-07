@@ -1,9 +1,4 @@
-/* -*- Mode: C; Package: (CParse C); Tab-width: 5 -*-
- * File: ZCTOKEN.C
- *
- *	This code has been placed in the public domain.
- *
- * This file contains the hand-coded tokenizer.
+/* This file contains the hand-coded tokenizer.
  * Design inspired by Jason T. Linhart.
  */
 

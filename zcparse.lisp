@@ -1,8 +1,3 @@
-; -*- Mode: Lisp; Package: (Zeta-C Global); Base: 10 -*-
-; File: ZCPARSE.LISP
-;
-;    This code has been placed in the public domain.
-;
 ; This file contains the parts of the C lexer and parser that are in Lisp
 ; (yylex and yyparse are still in C).
 

@@ -1,8 +1,4 @@
-/* -*- Mode: C; Package: (ZCLIB c); tab-width: 5; Base: 10 -*- */
-/* File: ZCCLIB.C
- *
- *	This code has been placed in the public domain.
- *
+/*
  * This file contains the portion of the ZETA-C runtime library that's in C.
  */
 

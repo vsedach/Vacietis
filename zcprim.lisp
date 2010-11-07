@@ -1,8 +1,3 @@
-; -*- Mode: Lisp; Package: Zeta-C; Base: 10 -*-
-; File: ZCPRIM.LISP
-;
-;    This code has been placed in the public domain.
-;
 ; This file contains the definitions of the Zeta-C primitives.
 
 

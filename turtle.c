@@ -1,5 +1,3 @@
-/* -*- Mode: C; Package: (Turtle C) -*- */
-
 #define ZETA_C_SUPPRESS_AUTO_FLOAT_TO_DOUBLE
 
 lispval window;

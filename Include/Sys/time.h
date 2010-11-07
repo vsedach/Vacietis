@@ -1,8 +1,4 @@
-/* -*- Mode: C; Base: 10 -*-
-
-	Copyright (C) 1986 by ZETA-SOFT, Ltd.
-	All rights reserved.
-
+/*
  STAT.H for ZETA-C: declarations for stat(), and fstat();
  To be done soon??
 

@@ -1,8 +1,4 @@
-/* -*- Mode: C; Package: CParse; Tab-width: 5; Base: 10 -*- */
-/* File: YTAB.C
- *
- *	This code has been placed in the public domain.
- *
+/*
  * This file contains the ZETA-C parser, as produced by Unix YACC.
  */
 

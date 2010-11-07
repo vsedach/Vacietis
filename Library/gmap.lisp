@@ -1,5 +1,3 @@
-; -*- Mode: LISP; Package: (GMAP GLOBAL 100); Base: 10 -*-
-;
 ; GMAP, version 3.1, by Scott Layson
 ;
 ; This is not the final version!  Suggestions welcome!

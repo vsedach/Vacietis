@@ -1,8 +1,3 @@
-; -*- Mode: Lisp; Package: Zeta-C; Tab-width: 5; Base: 10 -*-
-; File: ZCMISC.LISP
-;
-;	This code has been placed in the public domain.
-;
 ; This file contains miscellaneous macros and useful functions for Zeta-C.
 
 

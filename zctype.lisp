@@ -1,8 +1,3 @@
-; -*- Mode: Lisp; Package: Zeta-C; Base: 10 -*-
-; File: ZCTYPE.LISP
-;
-;    This code has been placed in the public domain.
-;
 ; This file contains the type checking and variable type recording code
 ; for Zeta-C.
 

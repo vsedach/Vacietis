@@ -1,8 +1,4 @@
-/* -*- Mode: C; Tab-width: 5; Base: 10 -*-
-
-	Copyright (C) 1986 by ZETA-SOFT, Ltd.
-	All rights reserved.
-
+/*
  SIGNAL.H for ZETA-C: declarations for signal(), raise(), and assorted
  signals.  Modeled after UNIX and ANSI.
 

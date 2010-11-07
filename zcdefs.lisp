@@ -1,8 +1,3 @@
-;;; -*- Mode: Lisp; Syntax: Zetalisp; Package: User; Base: 10 -*-
-;;; File: ZCDEFS.LISP
-;;;
-;;;	This code has been placed in the public domain.
-;;;	
 ;;; This file contains the system definition for ZETA-C.
 ;;; This is the Symbolics Genera 7 version.
 

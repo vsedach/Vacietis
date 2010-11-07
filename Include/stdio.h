@@ -1,8 +1,4 @@
-/* -*- Mode: C; Tab-width: 5; Base: 10 -*-
-
-	Copyright (C) 1984 by Scott W. Layson
-	All rights reserved.
-
+/*
  STDIO.H for ZETA-C: sets up the default I/O environment.
  Note this file does not have a package specification, as it will be
  read into (potentially) many different packages. */

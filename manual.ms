@@ -1,7 +1,6 @@
 @Comment{-*- Mode: Text; Fonts: tr10, tr10i, tr10b, gach10, gach10b, gach10i; VSP: 0; Tab-width: 5 -*-
 
    ZETA-C User's Guide
-   This document has been placed in the public domain.
 
 This file is set up for the FinalWord Formatter, v2.0.  By now it is pretty totally wired in to the Apple Laserwriter.}
 @Make(Manual)

@@ -1,8 +1,4 @@
-/* -*- Mode: C -*-
-
-	Copyright (C) 1986 by ZETA-SOFT, Ltd.
-	All rights reserved.
-
+/*
  CTYPE.H for ZETA-C: Macros for char manipulation.
  Note this file does not have a package specification, as it will be
  read into (potentially) many different packages.  */

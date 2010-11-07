@@ -1,8 +1,3 @@
-; -*- Mode: Lisp; Package: Zeta-C; Base: 10 -*-
-; File: ZCUSER.LISP
-;
-;    This code has been placed in the public domain.
-;
 ; This file contains the C listener and debugging support code.
 
 

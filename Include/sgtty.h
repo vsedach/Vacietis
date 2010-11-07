@@ -1,8 +1,4 @@
-/* -*- Mode: C; Tab-width: 5; Base: 10 -*-
-
-	Copyright (C) 1986 by ZETA-SOFT, Ltd.
-	All rights reserved.
-
+/*
  SGTTY.H for ZETA-C: declarations for stty(), gtty(), and ioctl().
  (Note that only part of the UNIX functionality is provided.)
  Note this file does not have a package specification, as it will be

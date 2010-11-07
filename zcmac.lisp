@@ -1,8 +1,3 @@
-; -*- Mode: Lisp; Package: Zeta-C; Tab-width: 5; Base: 10 -*-
-; File: ZCMAC.LISP
-;
-;	This code has been placed in the public domain.
-;
 ; This file contains the macro-expansion system for Zeta-C, which drives the
 ; C-to-Lisp translation, and the primitive-defining macro.
 

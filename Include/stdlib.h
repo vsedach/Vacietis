@@ -1,5 +1,3 @@
-/* -*- Mode: C -*- */
-
 /*
  * stdlib.h for ZETA-C: General Utilities
  */
