@@ -92,25 +92,13 @@
    and when one matches, executes the appropriate <body>.  The macro expander
    function is put on the ZCMAC>EXPAND property of the NAME."
   (let ((documentation (if (stringp (car bodies)) (car bodies)))
-	   (bodies (if (stringp (car bodies)) (cdr bodies) bodies)))
+        (bodies (if (stringp (car bodies)) (cdr bodies) bodies)))
     `(progn
 	  'compile
 	  (macro ,name (form &optional ignore)
 		    ,@(if documentation `(,documentation))
 		    (funcall (get ',name 'zcmac>expand) form nil nil))
-	  ,(zcmac>defprim-tell-zmacs name bodies)
 	  . ,(zcmac>prim-expander name bodies))))
-
-(defun zcmac>defprim-tell-zmacs (name bodies)
-  "Tells ZMacs how to indent forms calling this primitive.  Only works on the first
-   argument pattern given."
-  (let ((bodyarg (zcmac>prim-body-arg (caar bodies))))
-    (if bodyarg
-	   `(eval-when (compile load)
-		  #-Genera (set-in-alist zwei:*lisp-indent-offset-alist*
-							',name ',(list bodyarg 1))
-		  #+Genera (puthash ',name ',(list bodyarg 1)
-						zwei:*lisp-indentation-offset-hash-table*)))))
 
 (defun zcmac>prim-body-arg (arglist)
   "Finds the argument number of the &body argument, if any; else returns nil."
@@ -129,12 +117,11 @@
   "Generates a function to expand (translate from Zeta-C to Lisp) a call to a
    Zeta-C primitive."
   `((defun (:property ,name zcmac>expand) (**form **env **context)
-	 (in-area zc-temporary-area
-	   (let ((**args (cdr **form)))
-		(ignore **form **env **context **args)		 ; to suppress warnings.
-		(cond ,@(zcmac>expand-variations bodies)
-			 (t (zcerror "Wrong number of arguments, ~D, to Zeta-C primitive ~A: ~A"
-					   (length (cdr **form)) (car **form) **form))))))))
+      (let ((**args (cdr **form)))
+        (ignore **form **env **context **args)		 ; to suppress warnings.
+        (cond ,@(zcmac>expand-variations bodies)
+              (t (zcerror "Wrong number of arguments, ~D, to Zeta-C primitive ~A: ~A"
+                          (length (cdr **form)) (car **form) **form)))))))
 
 (defun zcmac>expand-variations (bodies)
   "For each of several variations on a primitive (defined by argument number), generates

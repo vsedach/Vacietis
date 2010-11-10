@@ -168,7 +168,7 @@
     (identifier
      ;; If the value is actually changing, reset the warnings memory.
      (when (not (zcenv>identifier-equal val (third bindframe)))
-       (setf (thirdcdr bindframe) nil))
+       (setf (cdddr bindframe) nil))
      ;; Walk down the alist, looking for possible conflicting declarations.
      (dolist (frame (get var binding-class))
        (when (and ;; If we're not on the same line of the same file ...
@@ -177,7 +177,7 @@
 		  (not (zcenv>identifier-equal val (third frame)))
 		  ;; ... and we haven't warned about this conflict before ...
 		  (not (mem #'zcenv>identifier-equal
-			    (third frame) (thirdcdr bindframe)))
+			    (third frame) (cdddr bindframe)))
 		  ;;(Exception: for static alternate names, no cross-file warnings)
 		  (or (and (neq (car val) 'static-alternate-name)
 			   (neq (car (third frame)) 'static-alternate-name))
@@ -191,7 +191,7 @@
 		   (zclstn>type-string (cdr (third frame))))
 		 (first frame) (second frame) (first frame))
 	 ;; Remember that we warned about this one.
-	 (push (third frame) (thirdcdr bindframe)))))
+	 (push (third frame) (cdddr bindframe)))))
     (definition
      (dolist (frame (get var binding-class))
        (when ;; When and we're either in a different file or more than 10

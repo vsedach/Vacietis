@@ -576,9 +576,8 @@ strings between C and Lisp)", Arglist "@it<str>", Doc "Given a Lisp string, retu
 two values: array and index) that points to the beginning of a copy of the string.  Appends a NUL to the copy.")
 
 @FunctionDoc(Name "@lt<zeta-c:string-to-lisp>@Index(@st<zeta-c:string-to-lisp>)@Index(@st<string-to-lisp>)", arglist
-"@it<str.array str.index> &optional@it< case>", Doc "Given a C character pointer <@it<str.array>, @it<str.index>>, returns a copy of
-its contents as a Lisp string.  @it<case>, if supplied, may be @lt<:upcase> or @lt<:downcase>, requesting a forced conversion to upper
-or lower case respectively.")
+"@it<str.array str.index>", Doc "Given a C character pointer <@it<str.array>, @it<str.index>>, returns a copy of
+its contents as a Lisp string.")
 
 The Lisp Machine's character set@Index(character set) is unusual in that the first 128 characters (0 through 177 octal)
 are all printing characters; the control characters are octal 200 through 237.  See your Lisp manual for more details.  As

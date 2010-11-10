@@ -813,8 +813,8 @@
 				  (= (length call) (length ocall))
 				  (gmap (:and) #'(lambda (type otype)
 						   (and (zctype>equal type otype)))
-					(:list (secondcdr call))
-					(:list (secondcdr ocall)))))
+					(:list (cddr call))
+					(:list (cddr ocall)))))
 		   (:list zcprim>*defun-function-call-info*)))
     (push call zcprim>*defun-function-call-info*)))
 
@@ -830,7 +830,7 @@
       (let ((caller (car call-info-entry))
 	    (calls (cdr call-info-entry)))
 	(dolist (call calls)
-	  (zctype>arglist-type-check (thirdcdr call) param-types fun caller)
+	  (zctype>arglist-type-check (cdddr call) param-types fun caller)
 	  (when (and (not (zctype>equal return-type (third call)))
 		     (not (zctype>void-p (third call))))
 	    (zcwarn "Function ~A assumed by ~A to return type /"~A/"; actual type /"~A/""

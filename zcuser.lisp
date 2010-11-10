@@ -100,7 +100,7 @@
 		  #\Abort))
 	;; *CATCH works in all systems, and we don't care about the return values.
 	(*catch 'return-from-c
-	  (do-forever
+	  (loop
 	    (nlet ((c-form (prog1 (zclstn>read c-stream break-p)
 				  (send standard-output :fresh-line)))
 		   ((ignore error-p

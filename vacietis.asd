@@ -9,6 +9,7 @@
   ((:static-file "vacietis.asd")
    (:static-file "vacietis.test.asd")
    (:file "package")
+   (:file "pointers")
    (:module :parser
             :components ((:file "parser"))))
   :depends-on (:anaphora))
