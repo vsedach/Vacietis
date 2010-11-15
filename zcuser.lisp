@@ -39,7 +39,7 @@
 
 (compile-flavor-methods c-listener)
 
-(#+3600 tv:add-select-key #-3600 tv:add-system-key #/{ 'c-listener "C Listener")
+(#+3600 tv:add-select-key #-3600 tv:add-system-key #\{ 'c-listener "C Listener")
 
 #+Symbolics
 (progn
@@ -294,8 +294,8 @@
   "Shifts the values and types of previously evaluated expressions down the
    chain of _-variables."
   (nlet ((genv (zcenv>global-env))
-	 ((_type (or (zcenv>type _sym genv) (zctype>int)))   ; Don't know how these
-	  (__type (or (zcenv>type __sym genv) (zctype>int)))))       ; become NIL.
+	 ((_type (or (var-type _sym genv) (zctype>int)))   ; Don't know how these
+	  (__type (or (var-type __sym genv) (zctype>int)))))       ; become NIL.
     (set ___sym nil)
     (zcprim>declare-external ___sym __type)
     (eval (zcprim>store-value ___sym __type __sym __type genv nil))
@@ -311,7 +311,7 @@
 
 (defun zclstn>print (value type stream)
   "Prints a value for the C listener."
-  (send stream :tyo #/()
+  (send stream :tyo #\()
   (zclstn>print-type type (zcenv>global-env) stream)
   (format stream ") ")
   (zclstn>print-value value type stream))
@@ -442,9 +442,9 @@
   (nlet ((str start end (if (arrayp str) (values str start end)
 			  (values (zcptr>array str) (+ start (zcptr>index str))
 				  (+ end (zcptr>index str))))))
-    (send stream :tyo #/")
+    (send stream :tyo #\")
     (do ((i start (1+ i)))
-	((or ( i end) ( i (array-length str))
+	((or (>= i end) (>= i (array-length str))
 	     (and (> i start) (= (aref-byte-safe str (1- i)) 0)
 		  mark-index (< mark-index i)))
 	 (when (and (< i (array-length str))
@@ -453,7 +453,7 @@
       (when (and mark-index (= mark-index i))
 	(send stream :display-lozenged-string "HERE->"))
       (when (< i end) (send stream :tyo (code-char (aref-byte-safe str i)))))
-    (send stream :tyo #/")))
+    (send stream :tyo #\")))
 
 #+3600
 (defun aref-byte-safe (str i)
@@ -461,7 +461,7 @@
   (nlet ((scale-factor (// (zctype>scale-size ':Q)
 			   (zctype>scale-size (zcprim>array-scale str))))
 	 ((scaled-index (// i scale-factor))))
-    (if (or ( scaled-index (// (array-length str) scale-factor))
+    (if (or (>= scaled-index (// (array-length str) scale-factor))
 	    (fixp (aref (zcprim>array-as-q str) scaled-index)))
 	(aref str i)
       0)))
@@ -492,7 +492,7 @@
 	       ((elt-type start len
 		  (zclstn>element-type index :8B (cadr desc) (caddr desc)))))))
 	(and (or (zctype>char-p dtype) (zctype>char-p elt-type))
-	     ( index 0) (< index (array-length array))
+	     (>= index 0) (< index (array-length array))
 	     (nlet ((elt-size (zctype>scale-size (zctype>type-scale elt-type)))
 		    ((start (max (* start elt-size) (- index width))))
 		    ((len (* len elt-size))))
@@ -523,11 +523,11 @@
 		(array-size (* (or array-size 1) (zctype>sizeof type env))))
 	   (zclstn>element-type-1 offset elt-type env (+ elt-base (- index offset))
 				  (+ array-offset (- index offset))
-				  array-size (and top-level ( index array-size)))))
+				  array-size (and top-level (>= index array-size)))))
 	((zctype>struct-p type)
 	 ;; Unions will require knowing the last tag stored.  Later...
 	 (nlet ((found elt-offset elt-type extended
-		 (and ( index 0)
+		 (and (>= index 0)
 		      (zctype>struct-offset-elt index :8B type env top-level))))
 	   (and found (zclstn>element-type-1 (- index elt-offset) elt-type env
 					     (+ elt-base elt-offset) 0 nil extended))))
@@ -549,7 +549,7 @@
       (do ((i 0 (1+ i))
 	   (lim (min (ceiling 20 (zctype>sizeof (zctype>pointer-deref-type type) env))
 		     length)))
-	  (( i lim) (when (< i length) (format stream "...")))
+	  ((>= i lim) (when (< i length) (format stream "...")))
 	(nlet ((exp type (zcprim>translate-for-top-level
 			   `(c:[] (c:quote+ ,value ,type) ,i) env)))
 	  (if (and (zctype>array-p type)
@@ -616,7 +616,7 @@
 		  (// index (zctype>sizeof-in-qs dtype (caddr desc)))))))))
 (defun zclstn>print-element-1 (index type env orig-type stream top-level)
   (cond ((zctype>match type orig-type env)
-	 (and ( index 0) (< index (zctype>sizeof type env)) index))
+	 (and (>= index 0) (< index (zctype>sizeof type env)) index))
 	((zctype>array-p type)
 	 (nlet ((elt-type (zctype>pointer-deref-type type))
 		((elt-len (zctype>sizeof elt-type env))))
@@ -626,7 +626,7 @@
 	((zctype>struct-p type)
 	 ;; Unions will require knowing the last tag stored.  Later...
 	 (nlet ((elt elt-offset elt-type
-		 (and ( index 0)
+		 (and (>= index 0)
 		      (zctype>struct-offset-elt index :8B type env top-level))))
 	   (if (null elt) nil
 	     (format stream ".~A" elt)
@@ -652,7 +652,7 @@
 	     (type (cadr desc))
 	     (env (caddr desc)))
 	 (unless already-started (format stream "#{"))
-	 (tyo #/( stream)
+	 (tyo #\( stream)
 	 (zclstn>print-type type env stream :short)
 	 (cond ((eq (named-structure-p object) 'value-cell)
 		(format stream ") ~A's value cell}" name))

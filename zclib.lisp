@@ -77,7 +77,7 @@
 
 (defmethod (unix-terminal-io-stream :listen) ()
   (or untyi-char
-      (and input-line ( input-index (string-length input-line)))
+      (and input-line (<= input-index (string-length input-line)))
       (send actual-stream :listen)))
 
 (defmethod (unix-terminal-io-stream :wait-for-input-with-timeout) (timeout)
@@ -208,7 +208,7 @@
   "Closes all files opened by a C program.  If ABORT-P is non-NIL, the
    files are closed and aborted."
   (do ((i 3 (1+ i)))
-      (( i (array-length *file-descriptor-table*)))
+      ((>= i (array-length *file-descriptor-table*)))
     (let ((stream (aref *file-descriptor-table* i)))
       (and stream (send stream :close (and abort-p ':abort))))
     (aset nil *file-descriptor-table* i)))
@@ -364,10 +364,10 @@
 	(send stream :set-no-echo (not (bit-test flags #o10))))
       0)))
 
-(defconstant TIOCGETP (deposit-byte 8 8 8 (char-code #/t)))
-(defconstant TIOCSETP (deposit-byte 9 8 8 (char-code #/t)))
-(defconstant TIOCSETN (deposit-byte 10 8 8 (char-code #/t)))
-(defconstant FIONREAD (deposit-byte 3 8 8 (char-code #/f)))
+(defconstant TIOCGETP (deposit-byte 8 8 8 (char-code #\t)))
+(defconstant TIOCSETP (deposit-byte 9 8 8 (char-code #\t)))
+(defconstant TIOCSETN (deposit-byte 10 8 8 (char-code #\t)))
+(defconstant FIONREAD (deposit-byte 3 8 8 (char-code #\f)))
 
 (defun-exporting c:|ioctl| (fd opcode thing.ar thing.idx)
   "Currently handles only TIOCGETP, TIOCSETP, TIOCSETN, and FIONREAD (for
@@ -477,7 +477,7 @@
   (do ((idx s.idx (1+ idx))
        (n n (1- n))
        (strm (zclib>stdio-to-lispm-stream sstream.ar sstream.idx "FGETS")))
-      (( n 1)
+      ((<= n 1)
        (aset (char-code NUL) s.ar idx)
        (values s.ar s.idx))
     (let ((c (send strm :tyi)))
@@ -573,7 +573,7 @@
    the array.  Returns the index of the first element EQ to X, or NIL if none."
   (do ((i from (1+ i))
        (to (or to (array-active-length array))))
-      (( i to) nil)
+      ((>= i to) nil)
     (when (eq x (aref array i))
       (return i))))
 
@@ -583,7 +583,7 @@
 	    func fd sfunc))
   (when (or (not (fixnump fd))
 	    (< fd 0)
-	    ( fd (array-length *file-descriptor-table*)))
+	    (>= fd (array-length *file-descriptor-table*)))
     (ferror "Illegal file descriptor ~S" fd))
   (or (aref *file-descriptor-table* fd)
       (ferror "File descriptor ~S refers to a closed file" fd)))
@@ -598,10 +598,6 @@
 (defun zclib>stdio-to-lispm-stream (sstream.ar sstream.idx func &optional kfunc)
   (ignore func kfunc)
   (zclib>fd-to-stream (zclib>stdio-to-fd sstream.ar sstream.idx) nil nil))
-
-(defprop zclib>stdio-to-lispm-stream t :error-reporter)
-
-(defprop zclib>fd-to-stream t :error-reporter)
 
 (defmacro zclib>initialize-file-pointer (name fd)
   (multiple-value-bind (array index)
@@ -755,13 +751,13 @@
   (while (memq (code-char (aref str.ar str.idx)) '(#\Space #\Tab))
     (incf str.idx))
   (let ((numstart str.idx))
-    (when (memq (code-char (aref str.ar str.idx)) '(#/+ #/-))
+    (when (memq (code-char (aref str.ar str.idx)) '(#\+ #\-))
       (incf str.idx))
     (while (or (digit-char-p (code-char (aref str.ar str.idx)))
-	       (char= (code-char (aref str.ar str.idx)) #/.))
+	       (char= (code-char (aref str.ar str.idx)) #\.))
       (incf str.idx))
-    (when (memq (code-char (aref str.ar str.idx)) '(#/e #/E)) (incf str.idx))
-    (when (memq (code-char (aref str.ar str.idx)) '(#/+ #/-)) (incf str.idx))
+    (when (memq (code-char (aref str.ar str.idx)) '(#\e #\E)) (incf str.idx))
+    (when (memq (code-char (aref str.ar str.idx)) '(#\+ #\-)) (incf str.idx))
     (while (digit-char-p (code-char (aref str.ar str.idx)))
       (incf str.idx))
     #+Symbolics (let ((len (- str.idx numstart)))
@@ -1014,12 +1010,12 @@
   "Reads a decimal value out of a string, stopping at the first non-digit.  Returns
    the value read and the next index in the string."
   (let ((positive (selectq (code-char (aref str idx))
-		      (#/+ (incf idx) t)
-		      (#/- (incf idx) nil)
+		      (#\+ (incf idx) t)
+		      (#\- (incf idx) nil)
 		      (t t))))
       (do ((ch (aref str idx) (aref str (incf idx)))
-	   (val 0 (+ (* val 10.) (- ch (char-code #/0)))))
-	  ((not (and ( ch (char-code #/0)) ( ch (char-code #/9))))
+	   (val 0 (+ (* val 10.) (- ch (char-code #\0)))))
+	  ((not (and (>= ch (char-code #\0)) (<= ch (char-code #\9))))
 	   (values (if positive val (- val)) idx)))))
 
 (defun zclib>print-integer (val width precision pad-char right-justify?
@@ -1115,7 +1111,7 @@
 	   (string-copy (string-append (if uppercase-E-format? "E" "e") 
 				       (if (not (minusp expt)) ""
 					 (setq expt (- expt)) "-")
-				       ;; Exponent must have  2 digits.
+				       ;; Exponent must have >= 2 digits.
 				       (if (< (abs expt) 10) "0" "")
 				       (format:output nil (princ expt)))
 			buffer 0 (fill-pointer buffer))
@@ -1134,9 +1130,9 @@
   (nlet ((integer exponent (si:integer-decode-float val))
 	 ((round-point relative-p
 	    (selectq conv-char
-	      (#/g (values precision nil))
-	      (#/f (values (- precision) t))
-	      (#/e (values (1+ precision) nil))
+	      (#\g (values precision nil))
+	      (#\f (values (- precision) t))
+	      (#\e (values (1+ precision) nil))
 	      (t (ferror "Internal error: CONV-CHAR must be one of e, f, g, not ~C"
 			 conv-char))))
 	  ((buffer decimal-exp ndigits
@@ -1144,44 +1140,44 @@
 					    nil (make-array 16. :type art-string
 							    :fill-pointer 0)))
 	   ((print-exp (if (zerop ndigits) 0 (1- decimal-exp)))
-	    ((e-fmt (or (char= conv-char #/e)
-			(and (char= conv-char #/g)
-			     (or ( print-exp precision)
+	    ((e-fmt (or (char= conv-char #\e)
+			(and (char= conv-char #\g)
+			     (or (>= print-exp precision)
 				 (< print-exp -4)))))
 	     ((decpoint (if e-fmt 1 decimal-exp))))))))
     (when (zerop ndigits)
-      (array-push buffer #/0)			; Must print at least one '0'.
+      (array-push buffer #\0)			; Must print at least one '0'.
       (setq decpoint 1))
     (while (> decpoint (fill-pointer buffer))	; When dec point is off right end,
-      (array-push-extend buffer #/0))		; add trailing '0's.
+      (array-push-extend buffer #\0))		; add trailing '0's.
     (setq ndigits (fill-pointer buffer))	; Update ndigits.
-    (unless (and (char= conv-char #/g) (not alternate-form?))
+    (unless (and (char= conv-char #\g) (not alternate-form?))
       ;; Add trailing '0's after the decimal point, if any.
-      (dotimes (i (max 0 (- precision (if (char= conv-char #/g) ndigits
+      (dotimes (i (max 0 (- precision (if (char= conv-char #\g) ndigits
 					(- ndigits decpoint)))))
-	(array-push-extend buffer #/0)))
+	(array-push-extend buffer #\0)))
     ;; Add leading '0's between dec point and first significant digit, if any.
     (while (< decpoint 1)
-      (array-insert-extend buffer #/0 0)
+      (array-insert-extend buffer #\0 0)
       (incf decpoint))
     ;; The raw digits are in BUFFER.  Now we have to insert the decimal point
     ;; (maybe) and maybe append the exponent.
     (unless (and (= decpoint (fill-pointer buffer)) (not alternate-form?))
-      (array-insert-extend buffer #/. decpoint))
+      (array-insert-extend buffer #\. decpoint))
     (when e-fmt
-      (array-push-extend buffer (if uppercase-E-format? #/E #/e))
+      (array-push-extend buffer (if uppercase-E-format? #\E #\e))
       (nlet ((print-exp negative? (if (minusp print-exp) (values (- print-exp) t)
 				    (values print-exp nil))))
-	(array-push-extend buffer (if negative? #/- #/+))
+	(array-push-extend buffer (if negative? #\- #\+))
 	;; And finally, print the exponent value.
 	(when (< print-exp 10.)
-	  (array-push-extend buffer #/0))	; Always two digits.
+	  (array-push-extend buffer #\0))	; Always two digits.
 	(labels ((recurse (val)
 		   (nlet ((quot rmdr (floor val 10.)))
 		     (when (not (zerop quot))
 		       (recurse quot))
 		     (array-push-extend buffer
-					(code-char (+ rmdr (char-code #/0)))))))
+					(code-char (+ rmdr (char-code #\0)))))))
 	  (recurse print-exp))))
     buffer))
 
@@ -1207,7 +1203,7 @@
 	(end (or end (array-active-length array)))
 	(a array))
     (do ((i start (1+ i)))
-	(( i end) nil)
+	((>= i end) nil)
       (when (= char (aref a i)) (return i)))))
 
 (defun zclib>substring (str start &optional (end (array-active-length str)))

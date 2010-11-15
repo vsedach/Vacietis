@@ -303,8 +303,6 @@
     ;; Symbolics Zmacs does not bind the right handlers for that (lose, lose).
     #+Symbolics (lexpr-funcall #'sys:read-error stream message args)))
 
-(defprop sys:parse-ferror t :error-reporter)
-
 (defmacro cparse:|LWarn| (c-parser error-point message &rest args)
   `(send ,c-parser :lex-warn ,error-point ,message . ,args))
 
@@ -572,7 +570,7 @@
   (when (memq :upcase options)
     (dotimes (i (string-length name))
       (aset (char-upcase (aref name i)) name i)))
-  (nlet (($pos (string-search-char #/$ name))
+  (nlet (($pos (string-search-char #\$ name))
 	 ((pkg
 	    (and $pos (pkg-find-package (string-upcase (nsubstring name 0 $pos))
 					:find c-package)))
@@ -688,7 +686,7 @@
 				    (char-code #\Return))
 		 (array-push-extend (input-source-string source) *ascii-NUL*)
 		 (if (or eof-p (zerop length)
-			 (not (char= #/\ (aref new-line (- length 1)))))
+			 (not (char= #\\ (aref new-line (- length 1)))))
 		     (setf (input-source-eof source) eof-p)
 		   (get-line (+ at-idx length -1))))))
       (get-line 0)
@@ -713,7 +711,7 @@
     (array-push-extend buffer *ascii-NUL*)
     (decf (fill-pointer buffer))
     (cparse:|LSetBuf| lexer-state 0 buffer (1- (fill-pointer buffer)))
-    (when (char= c #/\)
+    (when (char= c #\\)
       (let ((c (send self :tyi-interactive)))
 	(array-push-extend buffer (char-code c))
 	(array-push-extend buffer *ascii-NUL*)

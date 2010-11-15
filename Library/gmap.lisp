@@ -400,7 +400,7 @@
 	   (if incr
 	       `#'(lambda (val)
 		    (funcall ,bounds-fn-temp val ,stop-temp))
-	     `#'(lambda (val) ( val ,stop-temp)))
+	     `#'(lambda (val) (>= val ,stop-temp)))
 	 'nil)
       nil					; no argfn
       ,(if incr                                 ; nextfn
@@ -408,7 +408,7 @@
 	   '#'1+)
       (,@(if incr				; and let-specs
 	     `((,incr-temp ,incr)
-	       ((,bounds-fn-temp (if (minusp ,incr-temp) #' #')))))
+	       ((,bounds-fn-temp (if (minusp ,incr-temp) #'<= #'>=)))))
        ,@(if stop
 	     `((,stop-temp ,stop)))))))
 
@@ -437,7 +437,7 @@
   (let ((array-temp (gensym))
 	(stop (gensym)))
     `(0
-       #'(lambda (i) ( i ,stop))
+       #'(lambda (i) (>= i ,stop))
        #'(lambda (i) (aref ,array-temp i))
        #'1+
        ((,array-temp ,array)
@@ -448,8 +448,8 @@
   (let ((string-temp (gensym))
 	(stop (gensym)))
     `(0
-       #'(lambda (i) ( i,stop))
-       #'(lambda (i) (aref ,string-temp i))
+       (lambda (i) (>= i,stop))
+       (lambda (i) (aref ,string-temp i))
        #'1+
        ((,string-temp (string ,string))
 	((,stop (string-length ,string-temp)))))))
@@ -457,8 +457,8 @@
 (def-gmap-arg-type :STREAM (stream &optional (tyi-message ':tyi)
 					     (tyipeek-message ':tyipeek))
   `(,stream
-    #'(lambda (s) (null (send s ',tyipeek-message)))
-    #'(lambda (s) (send s ',tyi-message))))
+    (lambda (s) (null (send s ',tyipeek-message)))
+    (lambda (s) (send s ',tyi-message))))
 
 
 ; ******** Predefined result types ********
@@ -469,20 +469,20 @@
 (def-gmap-res-type :NCONC (&optional filterp)
   (let ((result-var (gensym)))			; have to use our own, sigh.
     `((locf ,result-var)			; init
-       #'(lambda (next-loc new)			; nextfn
+       (lambda (next-loc new)			; nextfn
 	   (rplacd next-loc new)
 	   (if new (locf (cdr (last new))) next-loc))
-       #'(lambda (ignore) ,result-var)
+       (lambda (ignore) ,result-var)
        ,filterp
        ((,result-var nil)))))
 
 (def-gmap-res-type :AND ()
-  '(t #'(lambda (ignore new)
-	  (if new new (return nil)))))
+  '(t (lambda (ignore new)
+        (if new new (return nil)))))
 
 (def-gmap-res-type :OR ()
-  '(nil #'(lambda (ignore new)
-	    (if new (return new) 'nil))))
+  '(nil (lambda (ignore new)
+          (if new (return new) 'nil))))
 
 (def-gmap-res-type :SUM ()
   '(0 #'+))
@@ -506,13 +506,13 @@
 (def-gmap-res-type :ARRAY (initial-empty-array)
   (let ((array-temp (gensym)))
     `(0						; init
-       #'(lambda (curr-index next-elt)		; nextfn
-	   (aset next-elt ,array-temp curr-index)
-	   (1+ curr-index))
-       #'(lambda (last-index)			; cleanup
-	   (if (array-has-leader-p ,array-temp)
-	       (store-array-leader last-index ,array-temp 0))
-	   ,array-temp)
+       (lambda (curr-index next-elt)		; nextfn
+         (aset next-elt ,array-temp curr-index)
+         (1+ curr-index))
+       (lambda (last-index)			; cleanup
+         (if (array-has-leader-p ,array-temp)
+             (store-array-leader last-index ,array-temp 0))
+         ,array-temp)
        nil					; filterp
        ((,array-temp ,initial-empty-array)))))	; let-specs
 

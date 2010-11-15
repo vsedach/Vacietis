@@ -97,17 +97,13 @@ thrown out of.  This is only a subset of the Symbolics functionality."
 ; Also it should be much better at saying what's being compiled.  This will be easy
 ; when we get the source locator system in.
 (defun zcerror (fmt &rest args)
-  (declare (special zcprim>*expanding-defunc+*))
-  (if zcprim>*expanding-defunc+*
+  (if *expanding-defunc+*
 	 (lexpr-funcall #'ferror (string-append "Error while C-compiling ~A:~%" fmt)
-				 (cons zcprim>*expanding-defunc+* args))
+				 (cons *expanding-defunc+* args))
     (lexpr-funcall #'ferror fmt args)))
 
-(defprop zcerror t :error-reporter)
-
 (defun zcwarn (fmt &rest args)
-  (declare (special zcprim>*expanding-defunc+*))
-  (let ((func zcprim>*expanding-defunc+*))
+  (let ((func *expanding-defunc+*))
     (if func
 	   (lexpr-funcall #'compiler:warn `(:function ,func) #-Symbolics nil fmt args)
 	 (send error-output ':fresh-line)

@@ -17,9 +17,6 @@
 (defsubst zcenv>source-loc-line ()
   (second *source-location*))
 
-(defsubst zcenv>source-editor-p ()
-  (third *source-location*))
-
 (defsubst zcenv>source-predefined-loc ()
   '(:predefined 0))
 
@@ -246,8 +243,7 @@
 		     (assq ':predefined alist)))
 	  ((value (third frame))))
 	 ((firstval (third (car alist)))))
-    (if (and frame (or (null file) (null (second frame)) ( line (second frame))
-		       (zcenv>source-editor-p)))
+    (if (and frame (or (null file) (null (second frame)) (>= line (second frame))))
 	(progn
 	  (when (and file (second frame) (< line (second frame))
 		     ;; Don't complain about undeclared int() or void().
@@ -305,15 +301,15 @@
   "Declares the type of a variable."
   (zcenv>declare var (cons 'type var-type) 'identifier env primary-binding))
 
-(defun zcenv>type (var env)
+(defun var-type (var env)
   "Retrieves the type of a declared variable, or NIL.  Second value is the
    environment depth at which the binding was found."
-  (nlet ((ident depth (zcenv>get var 'identifier env)))
+  (multiple-value-bind (ident depth) (zcenv>get var 'identifier env)
     (values (and ident
 		 (selectq (car ident)
 		   (type (cdr ident))
 		   (enum-constant (cadr ident))
-		   (static-alternate-name (zcenv>type (cdr ident) env))))
+		   (static-alternate-name (var-type (cdr ident) env))))
 	    depth)))
 
 (defun zcenv>identifier (var env)
@@ -330,7 +326,7 @@
   "Retrieves the type of a function from its name, or NIL."
   ;; Don't go to another file; we'll just assume :INT.
   (let ((zcenv>*attempt-substitution* nil))
-    (zcenv>type name env)))
+    (var-type name env)))
 
 (defsubst zcenv>declare-definition (var var-type env)
   "Declares the defining declaration of a variable."
@@ -436,7 +432,7 @@
 					  (first (cadr insert-point)))))
 	     (string-lessp file (first (cadr insert-point)))
 	     (and (eq file (first (cadr insert-point)))
-		  ( line (second (cadr insert-point)))))
+		  (<= line (second (cadr insert-point)))))
 	 (if (and (cdr insert-point)
 		  (eq file (first (cadr insert-point)))
 		  (= line (second (cadr insert-point))))
@@ -1158,7 +1154,7 @@
 
 (defun zctype>struct-offset-elt (offset scale type env &optional top-level)
   "Inverse of ZCTYPE>STRUCT-ELT-OFFSET.  Returns three values: the name of the
-   element, its offset (which will be  OFFSET) and its type.  Offsets are in
+   element, its offset (which will be <= OFFSET) and its type.  Offsets are in
    SCALE.  If TOP-LEVEL is non-NIL and the last element of the struct is an array,
    it is treated as of effectively infinite length; otherwise, NIL is returned if
    the OFFSET is past the end.  T is returned as the fourth value in this case."
@@ -1179,7 +1175,7 @@
 	  (values (zctype>eltpr-name (car elts))
 		  (zctype>rescale-index elt-offset elt-scale scale)
 		  elt-type
-		  ( 8b-offset (* next-offset
+		  (>= 8b-offset (* next-offset
 				  (zctype>scale-size next-scale)))))))))
 
 
@@ -1270,7 +1266,7 @@
 			 dup params)))
     ;; And finally, the (name type arghack) list.
     (mapcar #'(lambda (param)
-		(list param (zctype>widen-integral (zcenv>type param env))
+		(list param (zctype>widen-integral (var-type param env))
 		      (zcenv>get param 'arghack env)))
 	    params)))
 
@@ -1296,7 +1292,7 @@
 	(:list decls)))
 
 ; Some kind of not-quite-syntactic error in a declaration.
-(defflavor declaration-error (message) (error)
+(define-condition declaration-error (message) (error)
   (:initable-instance-variables))
 
 (defun zcdecl>parser-declaration (decl env)
@@ -1403,15 +1399,13 @@
 (defun zcdecl>function-static-alternate-name (name)
   "Finds a name of the form <func>$<name>$<i> that hasn't been used yet in this
    function."
-  (declare (special zcprim>*defun-specials* zcprim>*expanding-defunc+*))
-  (unless zcprim>*expanding-defunc+*
+  (unless *expanding-defunc+*
     (zcerror "A STATIC declaration in a block that's not inside a function??"))
   (labels ((try (i)
-	     (let ((actname (intern (format nil "~A$~A$~D"
-					    zcprim>*expanding-defunc+* name i))))
-	       (if (memq actname zcprim>*defun-specials*)
+	     (let ((actname (intern (format nil "~A$~A$~D" *expanding-defunc+* name i))))
+	       (if (memq actname *defun-specials*)
 		   (try (1+ i))
-		 (push actname zcprim>*defun-specials*)
+		 (push actname *defun-specials*)
 		 actname))))
     (try 1)))
 
@@ -2003,7 +1997,7 @@
 	 #+Symbolics (= (array-#-dims old-val) 1)
 	 (= (array-length old-val) len)
 	 (array-has-leader-p old-val)
-	 ( (array-leader-length old-val) (zcprim>array-leader-length))
+	 (>= (array-leader-length old-val) (zcprim>array-leader-length))
 	 old-val)))
 
 (defun zcdecl>fill-structure (init-ptr old-val)
@@ -2228,7 +2222,7 @@
 	 (let ((a a))
 	   (declare (sys:array-register a))
 	   (do ((i start (1+ i)))
-	       (( i end) a)
+	       ((>= i end) a)
 	     (aset val a i))))))
 
 
@@ -2252,6 +2246,3 @@
 	    (remprop var ':source-file-name))
 	variables)
   `',variables)
-
-
-; End of ZCTYPE.LISP

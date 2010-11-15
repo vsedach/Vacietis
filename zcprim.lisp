@@ -1,24 +1,23 @@
 ; This file contains the definitions of the Zeta-C primitives.
 
-
-(defvar zcprim>*expanding-defunc+* nil
+(defvar *expanding-defunc+* nil
   "T when a defunc+ expansion is in process.")
 
-(defvar zcprim>*defun-specials* :unbound
+(defvar *defun-specials* :unbound
   "A list of variables to be declared special, that's being accumulated for the
    top-level defun.")
 
-(defvar zcprim>*defun-static-inits* :unbound
+(defvar *defun-static-inits* :unbound
   "A list of initialization clauses for statics, that's being accumulated for the
    top-level defun.")
 
-(defvar zcprim>*defun-cleanup-forms* :unbound
+(defvar *defun-cleanup-forms* :unbound
   "A list of forms to do at the end of the function, with an unwind-protect even.")
 
-(defvar zcprim>*defun-toplevel-forms* :unbound
+(defvar *defun-toplevel-forms* :unbound
   "A list of miscellaneous things to do at top level of a defun.")
 
-(defvar zcprim>*defun-function-call-info* :unbound
+(defvar *defun-function-call-info* :unbound
   "A list of lists of the form
      (caller callee expected-return-type . arg-types-passed)
    telling how the function has been called from this function.")
@@ -60,8 +59,8 @@
 (defun zcprim>pointer-plus-int (arg1 arg2 type1 operation env)
   "Handles addition and subtraction of a pointer and an integer.  OPERATION should
    be #'ZCPRIM>+ or #'ZCPRIM>-."
-  (nlet ((let-clauses ptr-array ptr-index
-		      (zcprim>analyze-pointer-exp arg1 type1)))
+  (multiple-value-bind (let-clauses ptr-array ptr-index)
+      (analyze-pointer-exp arg1 type1)
     (values (zcprim>let-form let-clauses
 	      `(zcptr>cons ,ptr-array
 			   ,(funcall operation ptr-index
@@ -70,19 +69,19 @@
 
 (defun zcprim>pointer-subtract (arg1 type1 arg2 type2 env)
   "Handles the subtraction of two pointers."
-  (nlet ((let-clauses-1 array-1 index-1
-			(zcprim>analyze-pointer-exp arg1 type1))
-	 (let-clauses-2 array-2 index-2
-			(zcprim>analyze-pointer-exp arg2 type2)))
-    (if (not (and (zctype>arith-pointer-p type1) (zctype>arith-pointer-p type2)
-		  (zctype>match type1 type2 env)))
-	(zcerror "Wrong argument type in pointer subtraction: ~A or ~A"
-		 type1 type2)
-      (values (zcprim>let-form (append let-clauses-1 let-clauses-2)
-		`(if (zcptr>subtract-check ,array-1 ,array-2)
-		     ,(zcprim>unscale-ptr-difference (zcprim>- index-1 index-2)
-						     type1 env)))
-	      (zctype>int)))))
+  (multiple-value-bind (let-clauses-1 array-1 index-1)
+      (analyze-pointer-exp arg1 type1)
+    (multiple-value-bind (let-clauses-2 array-2 index-2)
+        (analyze-pointer-exp arg2 type2)
+      (if (not (and (zctype>arith-pointer-p type1) (zctype>arith-pointer-p type2)
+                    (zctype>match type1 type2 env)))
+          (zcerror "Wrong argument type in pointer subtraction: ~A or ~A"
+                   type1 type2)
+          (values (zcprim>let-form (append let-clauses-1 let-clauses-2)
+                                   `(if (zcptr>subtract-check ,array-1 ,array-2)
+                                        ,(zcprim>unscale-ptr-difference (zcprim>- index-1 index-2)
+                                                                        type1 env)))
+                  (zctype>int))))))
 
 (defprim c:*
   "Arithmetic multiplication.  Or, with one argument, pointer dereferencing."
@@ -93,38 +92,37 @@
 	 ((zctype>function-pointer-p type1)
 	  (values arg1 (zctype>pointer-deref-type type1)))
 	 (t
-	  (zcprim>deref-pointer arg1 type1 **env))))
+	  (deref-pointer arg1 type1 **env))))
   (((arg1 type1 :binary) (arg2 type2 :binary))
    (values (zcprim>* arg1 arg2)
 	   (zcprim>binary-arith-result "* (multiply)" type1 type2))))
 
-(defun zcprim>deref-pointer (ptr type env &optional unpacked-struct-reference)
+(defun deref-pointer (ptr type env &optional unpacked-struct-reference)
   "Creates an expression to dereference a pointer expression PTR, of type TYPE.
    Returns that as its first value, and the type of that as its second."
-  (nlet ((dtype (zctype>pointer-deref-type type))
-	 ((let-clauses array index (zcprim>analyze-pointer-exp ptr type))))
-    (values
-      (cond ((and (listp array) (eq (car array) 'zcprim>address-var) (eql index 0)
-		  ;; The following is to make sure a cast hasn't intervened.
-		  (zctype>equal type (zcenv>type (cadr array) env)))
-	     ;; Special case for "*&variable".
-	     (cadr array))
-	    ((or (zctype>struct-p dtype) (zctype>array-p dtype))
-	     ;; Special case for pointer-to-aggregate deref in flat mode.
-	     (zcprim>let-form let-clauses
-	       `(zcptr>flat-deref (zcptr>cons ,array ,index))))
-	    ;; Keep track of references to cells in unpacked structs, as they
-	    ;; require shorten-on-store just like variables.
-	    (unpacked-struct-reference
-	     (zcprim>let-form let-clauses `(aref ,array ,index)))
-	    (t (zcprim>let-form let-clauses (zcprim>aref array index dtype))))
-      dtype)))
+  (let ((dtype (zctype>pointer-deref-type type)))
+    (multiple-value-bind (let-clauses array index)
+        (analyze-pointer-exp ptr type)
+      (values
+       (cond ((and (listp array) (eq (car array) 'zcprim>address-var) (eql index 0)
+                   ;; The following is to make sure a cast hasn't intervened.
+                   (zctype>equal type (var-type (cadr array) env)))
+              ;; Special case for "*&variable".
+              (cadr array))
+             ((or (zctype>struct-p dtype) (zctype>array-p dtype))
+              ;; Special case for pointer-to-aggregate deref in flat mode.
+              (zcprim>let-form let-clauses
+                               `(zcptr>flat-deref (zcptr>cons ,array ,index))))
+             ;; Keep track of references to cells in unpacked structs, as they
+             ;; require shorten-on-store just like variables.
+             (unpacked-struct-reference
+              (zcprim>let-form let-clauses `(aref ,array ,index)))
+             (t (zcprim>let-form let-clauses (zcprim>aref array index dtype))))
+       dtype))))
 
 (defun zcprim>aref (array index type)
-  (cond ((zctype>signed-char-p type)
-	 `(zcptr>aref-s8b ,array ,index))
-	((zctype>signed-short-p type)
-	 `(zcptr>aref-s16b ,array ,index))
+  (cond ((zctype>signed-char-p type) `(zcptr>aref-s8b ,array ,index))
+	((zctype>signed-short-p type) `(zcptr>aref-s16b ,array ,index))
 	(t `(zcptr>aref ,array ,index))))
 
 (defun zcprim>aref-to-aset (aref-sym)
@@ -203,7 +201,7 @@
 		     exp))))
 
 (defun zcprim>variable-address (sym env)
-  (nlet ((ignore depth (zcenv>type sym env)))
+  (let ((depth (nth-value 1 (var-type sym env))))
     (when (> depth 0)
       (zcenv>annotate sym 'address-taken t env)))
   `(zcprim>address-var ,sym))
@@ -225,11 +223,11 @@
 		    (t `(ldb (byte ,(haulong arg1) ,(cadr ash-arg2))
 			     ,(cadr arg2))))))))
 
-(defprim c:/|
+(defprim c:\|
   "Bitwise OR."
   (((arg1 type1 :binary) (arg2 type2 :binary))
    (values (zcprim>logior arg1 arg2)
-	   (zcprim>binary-int-arith-result "/| (bitwise OR)" type1 type2))))
+	   (zcprim>binary-int-arith-result "\| (bitwise OR)" type1 type2))))
 
 (defprim c:^
   "Bitwise XOR."
@@ -316,9 +314,9 @@
 ; I'm not going to try to do constant folding in here.  Maybe later.
 (defun zcprim>pointer-compare (arg1 type1 arg2 type2 pred polarity)
   (nlet ((let-clauses-1 array-1 index-1
-			(zcprim>analyze-pointer-exp arg1 type1))
+			(analyze-pointer-exp arg1 type1))
 	 (let-clauses-2 array-2 index-2
-			(zcprim>analyze-pointer-exp arg2 type2))
+			(analyze-pointer-exp arg2 type2))
 	 ((test-form
 	    (cond ((neq pred 'eql)
 		   `(progn ,(and (not *compare-incomparable-pointers*)
@@ -416,9 +414,9 @@
 
 (defun zcprim>store-pointer-value (dest dest-type src src-type context)
   (nlet ((src-lets array index
-		   (zcprim>analyze-pointer-exp src src-type))
+		   (analyze-pointer-exp src src-type))
 	 (dest-lets dest-array dest-index
-		    (zcprim>analyze-pointer-exp dest dest-type))
+		    (analyze-pointer-exp dest dest-type))
 	 ((array-temp array-val (zcprim>select-trivial array dest-array context)))
 	 ((index-temp index-val (zcprim>select-trivial index dest-index context)))
 	 ;; We have to use VALUES here to make sure both parts of the
@@ -438,7 +436,7 @@
   (if (zcprim>trivial-p src) (values nil src)
     (if (zcprim>trivial-p dest) (values nil dest)
       (let ((temp (and (not (memq ':statement (car context)))
-		   (zcprim>gen-var))))
+		   (gen-var))))
 	(values temp temp)))))
 
 (defmacro zcprim>setf (dest value)
@@ -460,7 +458,7 @@
 	     `(multiple-value ,(cdr dest) ,value)
 	   ;; This will not be the best code, because very-short-lifetime locals
 	   ;; are poorly optimized.
-	   (let ((temps (mapcar #'(lambda (ignore) (zcprim>gen-var))
+	   (let ((temps (mapcar #'(lambda (ignore) (gen-var))
 				(cdr dest))))
 	     `(nlet ((,@temps ,value))
 		. ,(mapcar #'(lambda (place temp) `(zcprim>setf ,place ,temp))
@@ -496,9 +494,9 @@
 (defun zcprim>structure-assign (src dest type env)
   ;; I know this looks strange but it works iff zcprim>struct-reference does.
   (nlet ((int-array (zctype>array-of (zctype>int)))
-	 ((src-lets src-array src-index (zcprim>analyze-pointer-exp src int-array))
+	 ((src-lets src-array src-index (analyze-pointer-exp src int-array))
 	  (dst-lets dst-array dst-index
-	    (zcprim>analyze-pointer-exp dest int-array))))
+	    (analyze-pointer-exp dest int-array))))
     (zcprim>let-form (zcprim>subordinate-nlet-clauses
 		       (append src-lets dst-lets)
 		       `((ignore (zcprim>copy-structure
@@ -577,7 +575,7 @@
 
 (defun zcprim>increment (arg type name symbol-fun aref-exp-fun bit-field-exp-fun)
   (cond ((zctype>arith-pointer-p type)
-	 (nlet ((let-clauses array index (zcprim>analyze-pointer-exp arg type))
+	 (nlet ((let-clauses array index (analyze-pointer-exp arg type))
 		((index++ (zcprim>increment index (zctype>int) name
 					    symbol-fun aref-exp-fun nil))))
 	   (zcprim>let-form let-clauses `(zcptr>cons ,array ,index++))))
@@ -603,35 +601,36 @@
 
 (defun zcprim>pre-increment (arg type name op arg2 type2)
   (zcprim>increment
-    arg type name
-    #'(lambda (sym)
-	(nlet ((arg1 ignore arg2 type2
-		     (zcprim>standard-binary-coercions sym type arg2 type2)))
-	  `(setq ,sym ,(zcprim>shorten-if-necessary
-			 (zcprim>coerce-numbers (funcall op arg1 arg2) type2 type)
-			 type nil))))
-    #'(lambda (aref-sym array index)
-	(nlet ((arg1 ignore arg2 type2
-		     (zcprim>standard-binary-coercions `(,aref-sym ,array ,index)
-						       type arg2 type2)))
-	  `(,(zcprim>aref-to-aset aref-sym)
-	    ,(zcprim>shorten-if-necessary
-	       (zcprim>coerce-numbers (funcall op arg1 arg2) type2 type)
-	       type (neq aref-sym 'aref))
-	    ,array ,index)))
-    ;; Yeesh.  Bit fields.  What a mess.  Oh well.
-    #'(lambda (array index ldb-sym byte)
-	(nlet ((word-var (zcprim>gen-var))
-	       (byte-var (zcprim>gen-var))
-	       (arg1 ignore arg2 type2
-		     (zcprim>standard-binary-coercions `(aref ,array ,index)
-						       type arg2 type2)))
-	  `(nlet ((,word-var ,arg1)
-		  ((,byte-var ,(zcprim>coerce-numbers
-				 (funcall op `(,ldb-sym ,byte ,word-var) arg2)
-				 type2 type))))
-	     (aset (dpb ,byte-var ,byte ,word-var) ,array ,index)
-	     ,byte-var)))))
+   arg type name
+   (lambda (sym)
+     (multiple-value-bind (arg1 ignore arg2 type2)
+         (zcprim>standard-binary-coercions sym type arg2 type2)
+       `(setq ,sym ,(zcprim>shorten-if-necessary
+                     (zcprim>coerce-numbers (funcall op arg1 arg2) type2 type)
+                     type nil))))
+   (lambda (aref-sym array index)
+     (multiple-value-bind (arg1 ignore arg2 type2)
+         (zcprim>standard-binary-coercions `(,aref-sym ,array ,index) type arg2 type2)
+       `(,(zcprim>aref-to-aset aref-sym)
+          ,(zcprim>shorten-if-necessary (zcprim>coerce-numbers (funcall op arg1 arg2) type2 type)
+                                        type
+                                        (neq aref-sym 'aref))
+          ,array ,index)))
+   ;; Yeesh.  Bit fields.  What a mess.  Oh well.
+   (lambda (array index ldb-sym byte)
+     (let ((word-var (gen-var))
+           (byte-var (gen-var)))
+       (multiple-value-bind (arg1 ignore arg2 type2)
+           (zcprim>standard-binary-coercions `(aref ,array ,index)
+                                             type
+                                             arg2
+                                             type2)
+         `(let* ((,word-var ,arg1)
+                 (,byte-var ,(zcprim>coerce-numbers (funcall op `(,ldb-sym ,byte ,word-var) arg2)
+                                                    type2
+                                                    type)))
+            (aset (dpb ,byte-var ,byte ,word-var) ,array ,index)
+            ,byte-var))))))
 
 (defun zcprim>post-increment (arg type name op arg2 type2)
   (zcprim>increment
@@ -644,7 +643,7 @@
 							    type2 type)
 				     type nil)))))
     #'(lambda (aref-sym array index)
-	(nlet ((temp-var (zcprim>gen-var))
+	(nlet ((temp-var (gen-var))
 	       (arg1 ignore arg2 type2
 		     (zcprim>standard-binary-coercions `(,aref-sym ,array ,index)
 						       type arg2 type2)))
@@ -657,8 +656,8 @@
 		     ,array ,index)
 		    ,temp-var))))
     #'(lambda (array index ldb-sym byte)
-	(nlet ((word-var (zcprim>gen-var))
-	       (byte-var (zcprim>gen-var))
+	(nlet ((word-var (gen-var))
+	       (byte-var (gen-var))
 	       (arg1 ignore arg2 type2
 		     (zcprim>standard-binary-coercions `(aref ,array ,index) type
 						       arg2 type2)))
@@ -682,7 +681,7 @@
   (((arg1 type1 :lvalue) (arg2 type2))
    (zcprim>op-assign arg1 type1 arg2 type2 **env "*=" nil t 'zcprim>*)))
 
-(defprim c://=
+(defprim c:/=
   (((arg1 type1 :lvalue) (arg2 type2))
    (zcprim>op-assign arg1 type1 arg2 type2 **env "//=" nil t 'zcprim>//)))
 
@@ -703,7 +702,7 @@
   (((arg1 type1 :lvalue) (arg2 type2))
    (zcprim>op-assign arg1 type1 arg2 type2 **env "&=" nil nil 'zcprim>logand)))
 
-(defprim c:/|=
+(defprim c:\|=
   (((arg1 type1 :lvalue) (arg2 type2))
    (zcprim>op-assign arg1 type1 arg2 type2 **env "|=" nil nil 'zcprim>logior)))
 
@@ -740,8 +739,8 @@
     (if (or (zctype>arith-pointer-p ret-type)
 	    ;; Structures look like pointers thereto.
 	    (zctype>struct-p ret-type))
-	(let ((array-temp (zcprim>gen-var))
-	      (index-temp (zcprim>gen-var)))
+	(let ((array-temp (gen-var))
+	      (index-temp (gen-var)))
 	  (values (zcprim>let-form `((,array-temp ,index-temp ,trans-exp))
 		    `(zcptr>cons ,array-temp ,index-temp))
 		  ret-type))
@@ -784,7 +783,7 @@
 	    (zcprim>trans-function-arg-list-1 (cdr arg-exps) (cdr arg-types))))
       (if (not (zctype>arith-pointer-p type))
 	  (values (cons arg cdr-args) (cons type cdr-types) cdr-let-clauses)
-	(nlet ((let-clauses array index (zcprim>analyze-pointer-exp arg type)))
+	(nlet ((let-clauses array index (analyze-pointer-exp arg type)))
 	  (values (cons array (cons index cdr-args))
 		  (cons (zctype>canonicalize-pointer type) cdr-types)
 		  (append let-clauses cdr-let-clauses)))))))
@@ -825,7 +824,7 @@
   (nlet ((fun-type (zcenv>function-type fun (zcenv>global-env)))
 	 ((return-type (zctype>function-return-type fun-type))
 	  (param-types (zctype>function-param-types fun-type)))
-	 (zcprim>*expanding-defunc+* fun))
+	 (*expanding-defunc+* fun))
     (dolist (call-info-entry (get fun 'call-info-alist))
       (let ((caller (car call-info-entry))
 	    (calls (cdr call-info-entry)))
@@ -865,11 +864,11 @@
    (cond ((and (zctype>arith-pointer-p type1) (zctype>integer-p type2))
 	  (nlet ((offset-exp type
 		  (zcprim>pointer-plus-int arg1 arg2 type1 #'zcprim>+ **env)))
-	    (zcprim>deref-pointer offset-exp type **env)))
+	    (deref-pointer offset-exp type **env)))
 	 ((and (zctype>arith-pointer-p type2) (zctype>integer-p type1))
 	  (nlet ((offset-exp type
 		  (zcprim>pointer-plus-int arg2 arg1 type2 #'zcprim>+ **env)))
-	    (zcprim>deref-pointer offset-exp type **env)))
+	    (deref-pointer offset-exp type **env)))
 	 (t
 	  (zcerror "Wrong argument type to [] (array ref): ~A or ~A"
 		   type1 type2)))))
@@ -883,7 +882,7 @@
    (if (not (zctype>pointer-p stype))
        (zcerror "Wrong first argument type to -> (struct//union reference): ~A"
 		stype)
-     (zcprim>struct-reference "->" (zcprim>deref-pointer struct-p stype **env)
+     (zcprim>struct-reference "->" (deref-pointer struct-p stype **env)
 			      (zctype>pointer-deref-type stype)
 			      stype elt **env **context))))
 
@@ -902,7 +901,7 @@
       (if (not eltpr)
 	  (zcerror "Element ~A not found in struct//union type ~A" elt stype)
 	(nlet ((access-exp result-type
-		(zcprim>deref-pointer
+		(deref-pointer
 		  (zcprim>pointer-plus-int
 		    (zcprim>coerce-struct-pointer struct elt-type
 						  (neq (zctype>struct-class stype)
@@ -928,7 +927,7 @@
 (defmacro ldb-signed (bytespec word)
   (unless (and (listp bytespec) (and (eq (car bytespec) 'byte)))
     (ferror "ZETA-C internal error: (BYTE ...) form expected, not ~S" bytespec))
-  (nlet ((temp (zcprim>gen-var))
+  (nlet ((temp (gen-var))
 	 (size (cadr bytespec)))
     `(nlet ((,temp (ldb ,bytespec ,word)))
        (dpb ,temp (byte ,(1- size) 0) (- (ldb (byte 1 ,(1- size)) ,temp))))))
@@ -938,7 +937,7 @@
 (defun zcprim>coerce-struct-pointer (ptr elt-type unpacked)
   "Given a pointer to some kind of struct, coerces it to point to ELT-TYPE."
   (nlet ((let-clauses array index
-	  (zcprim>analyze-pointer-exp ptr (zctype>array-of (zctype>int)))))
+	  (analyze-pointer-exp ptr (zctype>array-of (zctype>int)))))
     (selectq (zctype>type-scale elt-type unpacked)
       (:Q ptr)
       (:16B (zcprim>let-form let-clauses
@@ -1009,13 +1008,6 @@
     (:8B (setf (zcprim>art-8B-slot frob) value))
     #+Chars (:STRING (setf (zcprim>art-string-slot frob) value))))
 
-#+Symbolics 
-(defprop zcprim>scale-slot
-	 ((zcprim>scale-slot scale frob)
-	  . (zcprim>store-scale-slot scale frob si:val))
-	 setf)
-
-#-Symbolics 
 (defsetf zcprim>scale-slot zcprim>store-scale-slot)
 
 (defun zcprim>rescale-array (from-scale to-scale frob)
@@ -1252,10 +1244,10 @@
 	 ((memq pred '(T NIL))	   ; constant fold.
 	  (if pred (values cons ctype) (values alt atype)))
 	 ((zctype>arith-pointer-p ctype)
-	  (nlet ((c-lets c-array c-index (zcprim>analyze-pointer-exp cons ctype))
-		 (a-lets a-array a-index (zcprim>analyze-pointer-exp alt atype))
-		 (res-array (zcprim>gen-var))
-		 (res-index (zcprim>gen-var)))
+	  (nlet ((c-lets c-array c-index (analyze-pointer-exp cons ctype))
+		 (a-lets a-array a-index (analyze-pointer-exp alt atype))
+		 (res-array (gen-var))
+		 (res-index (gen-var)))
 	    ;; Damn I'm brilliant.  What a pain this is!
 	    (values (zcprim>let-form
 		      `((,res-array ,res-index
@@ -1276,15 +1268,15 @@
   (((pred ptype :boolean) (cons ctype :statement) &optional (alt atype :statement))
    (ignore ptype ctype atype)	      ; ptype handled by zcprim>standard-coercions.
    (if alt
-       (let ((alt-label (zcprim>gen-label))
-	     (next-label (zcprim>gen-label)))
+       (let ((alt-label (gen-label))
+	     (next-label (gen-label)))
 	 `((if (not ,pred) (go ,alt-label))
 	   ,@cons
 	   (go ,next-label)
 	   ,alt-label
 	   ,@alt
 	   ,next-label))
-     (let ((next-label (zcprim>gen-label)))
+     (let ((next-label (gen-label)))
        `((if (not ,pred) (go ,next-label))
 	 ,@cons
 	 ,next-label)))))
@@ -1297,11 +1289,9 @@
 	   ((init-forms (zcprim>auto-init-forms auto-inits env
 						(cons '(:statement) **context))))
 	   ((freelist-clauses (zcprim>auto-freelist-clauses auto-inits)))))
-     (setq zcprim>*defun-specials* (nconc specials zcprim>*defun-specials*))
-     (setq zcprim>*defun-static-inits*
-	   (nconc static-inits zcprim>*defun-static-inits*))
-     (setq zcprim>*defun-toplevel-forms*
-	   (nconc zcprim>*defun-toplevel-forms* toplevel-forms))
+     (setf *defun-specials* (append specials *defun-specials*))
+     (setf *defun-static-inits* (append static-inits *defun-static-inits*))
+     (setf *defun-toplevel-forms* (append *defun-toplevel-forms* toplevel-forms))
      (nlet ((d-block-frame (and auto-inits (list ':d-block (ncons ':setjmps))))
 	    ((block-ctx (list* d-block-frame `(:locals . ,auto-inits) **context))
 	     ((body (append init-forms
@@ -1328,19 +1318,19 @@
 (defun zcprim>auto-init-forms (init-clauses env context)
   "Given a list of clauses of the form (<var> <type> <init>), returns a list of
    Lisp forms to assign the initial values to the variables."
-  (mapcan #'(lambda (clause)
-	      ;; The init-exp has already been translated and typed.
-	      (and (caddr clause)
-		   (if (or (zctype>array-p (cadr clause))
-			   (zctype>struct-p (cadr clause)))
-		       ;; STORE-VALUE assumes aggregates pre-exist; can't use here.
-		       `((setq ,(car clause) ,(caddr clause)))
+  (mapcan (lambda (clause)
+            ;; The init-exp has already been translated and typed.
+            (and (caddr clause)
+                 (if (or (zctype>array-p (cadr clause))
+                         (zctype>struct-p (cadr clause)))
+                     ;; STORE-VALUE assumes aggregates pre-exist; can't use here.
+                     `((setq ,(car clause) ,(caddr clause)))
 		     ;; Pointers have to be rplaca/d'ed, and chars masked.
 		     (zcprim>standard-coercions
-		       (zcprim>store-value
-			 (zcprim>variable-reference (car clause) env context)
-			 (cadr clause) (caddr clause) (cadr clause) env context)
-		       (cadr clause) context nil))))
+                      (zcprim>store-value
+                       (zcprim>variable-reference (car clause) env context)
+                       (cadr clause) (caddr clause) (cadr clause) env context)
+                      (cadr clause) context nil))))
 	  init-clauses))
 
 (defun zcprim>auto-freelist-clauses (auto-inits)
@@ -1451,9 +1441,9 @@
 (defprim c:|while|
   (((pred ptype :boolean) &quote &body body)
    (ignore ptype)
-   (nlet ((break-label (zcprim>gen-label))
-	  (continue-label (zcprim>gen-label))
-	  (loop-label (zcprim>gen-label))
+   (nlet ((break-label (gen-label))
+	  (continue-label (gen-label))
+	  (loop-label (gen-label))
 	  ((body (zcprim>translate-block
 		   body **env **context
 		   ':break break-label ':continue continue-label))))
@@ -1467,9 +1457,9 @@
 (defprim c:|do|
   ((&quote stmt &eval (pred ptype :boolean))
    (ignore ptype)
-   (nlet ((loop-label (zcprim>gen-label))
-	  (break-label (zcprim>gen-label))
-	  (continue-label (zcprim>gen-label))
+   (nlet ((loop-label (gen-label))
+	  (break-label (gen-label))
+	  (continue-label (gen-label))
 	  ((body (zcprim>translate-block
 		   (ncons stmt) **env **context
 		   ':break break-label ':continue continue-label))))
@@ -1483,10 +1473,10 @@
   (((init inittype :statement) (pred ptype :boolean) (incr inctype :statement)
     &quote &body body)
    (ignore inittype ptype inctype)
-   (nlet ((break-label (zcprim>gen-label))
-	  (continue-label (zcprim>gen-label))
-	  (loop-label (zcprim>gen-label))
-	  (test-label (zcprim>gen-label))
+   (nlet ((break-label (gen-label))
+	  (continue-label (gen-label))
+	  (loop-label (gen-label))
+	  (test-label (gen-label))
 	  ((body (zcprim>translate-block
 		   body **env **context
 		   ':break break-label ':continue continue-label))))
@@ -1532,7 +1522,7 @@
 	    (zcerror "Attempt to return (a pointer to) auto array ~A" val))
 	   ((zctype>arith-pointer-p functype)
 	    (nlet ((let-clauses array index
-				(zcprim>analyze-pointer-exp val valtype)))
+				(analyze-pointer-exp val valtype)))
 	      `(,(zcprim>let-form let-clauses
 		   `(return-from ,funcname (values ,array ,index))))))
 	   ((null ret-temp) `((return-from ,funcname ,val)))
@@ -1543,7 +1533,7 @@
 	    (nlet ((store-exp (zcprim>store-value ret-temp functype val valtype
 						  **env **context))
 		   ((let-clauses array index
-				 (zcprim>analyze-pointer-exp store-exp valtype))))
+				 (analyze-pointer-exp store-exp valtype))))
 	      `(,(zcprim>let-form let-clauses
 		   `(return-from ,funcname (values ,array ,index))))))))))
 
@@ -1557,7 +1547,7 @@
        (zcerror "The body of a switch statement must be a block, with no
   declarations (the latter is a Zeta-C restriction)")
      (nlet ((body (cddar body))
-	    (break-label (zcprim>gen-label))
+	    (break-label (gen-label))
 	    ((labels explicit-default (zcprim>switch-labels body))
 	     ((default-label (or explicit-default break-label)))))
        `(,(zcprim>switch-selectq arg body labels default-label)
@@ -1575,7 +1565,7 @@
       ((null body) (values (nreverse labels) explicit-default))
     (when (or (and (listp (car body)) (eq (caar body) 'c:|case|))
 	      (eq (car body) 'c:|default|))
-      (push (zcprim>gen-label) labels)
+      (push (gen-label) labels)
       (when (eq (car body) 'c:|default|)
 	(setq explicit-default (car labels))))))
 
@@ -1603,8 +1593,8 @@
        (skips 0 (if (> (caadr clauses) (1+ (caar clauses)))
 		    (1+ skips) skips)))
       ((null (cdr clauses))
-       (and ( length 8)
-	    ( (// (float skips) (1- length)) .4s0)))))
+       (and (>= length 8)
+	    (<= (// (float skips) (1- length)) .4s0)))))
 
 (defun zcprim>switch-binary-search (arg clauses default-label)
   "Generates an open-coded binary search to find the value of ARG in a fixed list
@@ -1616,7 +1606,7 @@
 	 ((tree (zcprim>switch-binary-search-1 var clauses (length clauses) min max
 					       `(go ,default-label)))))
     (zcprim>let-form let-clauses
-      `(if (and ( ,var ,min) ( ,var ,max)) ,tree (go ,default-label)))))
+      `(if (and (>= ,var ,min) (<= ,var ,max)) ,tree (go ,default-label)))))
 (defun zcprim>switch-binary-search-1 (var clauses length min max default)
   "Generates an open-coded binary search to find the value of VAR in a fixed list
    of integers, which are the cars of CLAUSES (which is assumed to have length
@@ -1661,7 +1651,7 @@
 	      (zclstn>type-string jb-type)))
    (when (second (assq ':statement **context))
      (zcerror "ZETA-C restriction: only one SETJMP call allowed in a statement"))
-   (let ((label (intern (zcprim>gen-label))))
+   (let ((label (intern (gen-label))))
      (push label (cdr (assq ':setjmps (cdr (assq ':d-block **context)))))
      (setf (second (assq ':statement **context))
 	   `((setq .setjmp-return-value. 0)
@@ -1694,12 +1684,12 @@
 	 (env (zcenv>create-env (zcenv>global-env)))
 	 ((func type params func-type-declarers
 		(zcdecl>function-declaration func-decl param-decls env)))
-	 (((zcprim>*expanding-defunc+* func)))
-	 (zcprim>*defun-specials* nil)
-	 (zcprim>*defun-static-inits* nil)
-	 (zcprim>*defun-cleanup-forms* nil)
-	 (zcprim>*defun-toplevel-forms* nil)
-	 (zcprim>*defun-function-call-info* nil)
+	 (((*expanding-defunc+* func)))
+	 (*defun-specials* nil)
+	 (*defun-static-inits* nil)
+	 (*defun-cleanup-forms* nil)
+	 (*defun-toplevel-forms* nil)
+	 (*defun-function-call-info* nil)
 	 (((hook (zcprim>defunc+-hook func type env))))
 	 #+Symbolics
 	 (save-rfdw compiler:*reset-function-definition-warnings*))
@@ -1748,7 +1738,7 @@
 	 (cons '&optional (zcprim>process-param-list-2 params env t)))
 	(t (zcprim>process-param-list-2 params env optarg-found-p))))
 (defun zcprim>process-param-list-2 (params env optarg-found-p)
-  (let ((type (zcenv>type (car params) env)))
+  (let ((type (var-type (car params) env)))
     (if (zctype>arith-pointer-p type)
 	(nlet ((array-sym index-sym (zcprim>pointer-var-pair (car params))))
 	  (list* (if (not optarg-found-p) array-sym (list array-sym nil))
@@ -1770,7 +1760,7 @@
        (or *firstclass-structures*
 	   (zcerror "Returning structures from functions is not allowed.  If you would like to
   permit it (for Unix compatibility), setq zeta-c:*firstclass-structures* to T."))
-       (let ((ret-temp (zcprim>gen-var)))
+       (let ((ret-temp (gen-var)))
 	 (push `(,ret-temp (zcdecl>create-or-reuse-structure nil ',ret-type ',env))
 	       zcprim>*defun-static-inits*)
 	 ret-temp)))
@@ -1792,11 +1782,9 @@
 	   ((body (zcprim>let-form argument-lets body))
 	    ;; And finally, the declarations.
 	    ((body `((declare
-		       (unspecial
-			 . ,(rem-if #'(lambda (x) (memq x '(&optional &rest)))
-				    lambda-list))
-		       (special . ,zcprim>*defun-specials*)
-		       (special . ,(mapcar #'car zcprim>*defun-static-inits*)))
+                      ;; (unspecial ,@(rem-if (lambda (x) (memq x '(&optional &rest))) lambda-list)) ;; cl has no equivalent - is this needed?
+                      (special ,@*defun-specials*)
+                      (special ,@(mapcar #'car zcprim>*defun-static-inits*)))
 		     ,body)))))))
     (values lambda-list body)))
 
@@ -1806,7 +1794,7 @@
 (defun zcprim>massage-params-1 (params env clauses)
   (if (null params) (nreverse clauses)
     (nlet ((param (car params))
-	   ((type (zcenv>type param env))))
+	   ((type (var-type param env))))
       (cond ((and (null (cdr params))
 		  (eq (zcenv>get param 'arghack env) ':restarg))
 	     (cons (zcprim>restarg-init param) (nreverse clauses)))
@@ -1856,7 +1844,7 @@
    DISPLACED-TO, of length LENGTH (the latter two are expressions).  ART is the
    array-type symbol; ID is the id-list of the array (leader 0); NSS is the
    named-structure-symbol.  Second value is a list of cleanup-forms."
-  (let ((freelist-var (zcprim>gen-var)))
+  (let ((freelist-var (gen-var)))
     (push `(,freelist-var nil) zcprim>*defun-static-inits*)
     (values
       `(,var
@@ -1924,7 +1912,7 @@
 
 ; Should this do stack arrays on the 3600?  This is probably faster...
 (defun zcprim>struct-arg-init (param type env)
-  (let ((freelist-var (zcprim>gen-var)))
+  (let ((freelist-var (gen-var)))
     (push `(,freelist-var nil) zcprim>*defun-static-inits*)
     ;; We chain the freelist through an element of the array-leader.
     (push `(progn (setf (zcprim>array-freelist-link ,param) ,freelist-var)
@@ -1987,7 +1975,7 @@
 (defun zcprim>extern (vars)
   (mapc #'(lambda (var)
 	    (unless (get var 'special) (putprop var t 'special))
-	    (let ((type (zcenv>type var (zcenv>global-env))))
+	    (let ((type (var-type var (zcenv>global-env))))
 	      (when (and (not (boundp var)) (zctype>array-p type))
 		(set var
 		     (make-array 0 :leader-list (zcprim>array-leader-init
@@ -2037,8 +2025,8 @@
     ((and (zctype>word-p exp-type) (zctype>arith-pointer-p type))
      ;; An int (or lispval) to a pointer -- see if the int already holds a cons.
      (nlet ((exp let-clauses (zcprim>make-temp-if-needed exp))
-	    (array (zcprim>gen-var))
-	    (index (zcprim>gen-var))
+	    (array (gen-var))
+	    (index (gen-var))
 	    ((a&i-lets
 	       `((,array ,index
 		  ,(if (numberp exp) `(values nil ,exp)
@@ -2052,7 +2040,7 @@
     ((and (zctype>arith-pointer-p exp-type) (zctype>word-p type))
      ;; A pointer to an int (or lispval) -- see if the array is NIL.
      (nlet ((let-clauses array index
-			 (zcprim>analyze-pointer-exp exp exp-type)))
+			 (analyze-pointer-exp exp exp-type)))
        (values (zcprim>let-form let-clauses
 		 (if (stringp array)
 		     `(zcptr>cons ,array ,index)
@@ -2067,7 +2055,7 @@
 	    ((dscale (zctype>type-scale ddtype))
 	     (dvoidp (zctype>void-p ddtype))))
        (values
-	 (nlet ((let-clauses array index (zcprim>analyze-pointer-exp exp exp-type))
+	 (nlet ((let-clauses array index (analyze-pointer-exp exp exp-type))
 		((array (cond (dvoidp array)
 			      (evoidp `(and ,array
 					    (zcprim>array-as-scale ',dscale ,array)))
@@ -2092,7 +2080,7 @@
     ;; array: if NIL, we generate a null function pointer.
     ((and (zctype>pointer-p exp-type) (zctype>function-pointer-p type))
      (nlet ((let-clauses array
-	     (zcprim>analyze-pointer-exp exp exp-type :must-bind nil)))
+	     (analyze-pointer-exp exp exp-type :must-bind nil)))
        (values (zcprim>let-form let-clauses `(or ,array 'null-function-pointer))
 	       type)))
     ;; ... and when casting back to a normal pointer, we check for the null pf.
@@ -2223,7 +2211,7 @@
   "Top-level inclusion of Lisp code.  This returns a Lisp form rather than a list
    of translated expressions."
   (ignore type)
-  `(progn . ,forms))
+  `(progn ,@forms))
 
 (defun zcprim>translate-for-top-level (c-form env)
   "Translates a C form for the C listener.  Returns two values: the translated form
@@ -2233,7 +2221,7 @@
 			    (zcmac>translate-exp c-form env '((:top-level))))))
     (if (zctype>canonicalized-pointer-p type)
 	(nlet ((let-clauses array index
-		(zcprim>analyze-pointer-exp trans-form type)))
+		(analyze-pointer-exp trans-form type)))
 	  ;; Won't hurt to cons at this level...
 	  (values (zcprim>let-form let-clauses `(zcptr>cons ,array ,index)) type))
       (values trans-form type))))
@@ -2261,13 +2249,13 @@
 	  (zcdecl>declare-one-name name type nil ':external nil
 				   (zcenv>global-env))))
     (eval eval-form)
-    (mapc #'(lambda (init) (set (car init) (eval (cadr init)))) inits)))
+    (mapc (lambda (init) (set (car init) (eval (cadr init)))) inits)))
 
 
 ; ================================================================
 ; Pointer manipulation assistance.
 
-(defun zcprim>analyze-pointer-exp (exp type &optional &key (must-bind t))
+(defun analyze-pointer-exp (exp type &optional &key (must-bind t))
   "Analyzes a pointer-valued expression to see if it is doing consing.  In any
    case, it returns four values: a list of let-clauses; an expression for the
    array of the pointer; an expression for the index of the pointer; and T if the
@@ -2278,8 +2266,9 @@
    RESTRICTION: if EXP is an NLET-expression, it must have only one form in
    its body!"
   (declare (values let-clauses array index conses-p))
-  (zcprim>analyze-pointer-exp-f exp type must-bind))
-(defun zcprim>analyze-pointer-exp-f (exp type must-bind)
+  (analyze-pointer-exp-f exp type must-bind))
+
+(defun analyze-pointer-exp-f (exp type must-bind)
   (bcond ((or (zctype>zero-p type)
 	      (and (zctype>null-pointer-p type) (fixp exp)))
 	  (values nil nil exp nil))
@@ -2287,14 +2276,14 @@
 	       (or (nlistp exp) (eq (car exp) 'quote)))
 	  (values nil exp 0 nil))
 	 ((zctype>function-pointer-p type)
-	  (zcerror "Internal error: ZCPRIM>ANALYZE-POINTER-EXP called on a function pointer"))
+	  (zcerror "Internal error: ANALYZE-POINTER-EXP called on a function pointer"))
 	 ((and (symbolp exp) (zctype>canonicalized-pointer-p type))
 	  (nlet ((array index (zcprim>pointer-var-pair exp)))
 	    (values nil array index t)))
 	 ;; ZCPTR>FLAT-DEREF is an identity function, used only to distinguish
 	 ;; this case from the previous one.
 	 ((and (listp exp) (eq (car exp) 'zcptr>flat-deref))
-	  (zcprim>analyze-pointer-exp-f (cadr exp)
+	  (analyze-pointer-exp-f (cadr exp)
 					(zctype>canonicalize-pointer type)
 					must-bind))
 	 ((and (zctype>canonicalized-pointer-p type)
@@ -2315,7 +2304,7 @@
 	      (values let-clauses array index (car exp)))))
 	 ((eq (car exp) 'nlet)
 	  (nlet ((let-clauses array index conses-p
-		  (zcprim>analyze-pointer-exp-f (caddr exp) type must-bind)))
+		  (analyze-pointer-exp-f (caddr exp) type must-bind)))
 	    (values (zcprim>subordinate-nlet-clauses (cadr exp) let-clauses)
 		    array index conses-p)))
 	 (((let-clauses array index arefs-p (zcprim>analyze-aref-exp exp type))
@@ -2330,7 +2319,7 @@
 	 ((not must-bind)
 	  (values nil `(zcptr>array ,exp) `(zcptr>index ,exp) nil))
 	 (t
-	   (let ((temp-var (zcprim>gen-var)))
+	   (let ((temp-var (gen-var)))
 	      (values `((,temp-var ,exp)) `(zcptr>array ,temp-var)
 		      `(zcptr>index ,temp-var) nil)))))
 
@@ -2359,21 +2348,21 @@
   (cond ((and (stringp exp) (not (zctype>array-p req-type)))
 	 `(quote ,(cons-in-area exp 0 zc-permanent-area)))
 	((and (zctype>array-p type) (not (zctype>array-p req-type)))
-	 (nlet ((let-clauses array index (zcprim>analyze-pointer-exp exp type)))
+	 (nlet ((let-clauses array index (analyze-pointer-exp exp type)))
 	   (zcprim>let-form let-clauses `(zcptr>cons ,array ,index))))
 	((and (zctype>zero-p type) (zctype>arith-pointer-p req-type))
 	 (zcprim>null-pointer))
 	(t exp)))
 
 (defun zcprim>scale-ptr-offset (offset type env)
-  "If a /"flat/" storage representation is in use, pointer offsets have to be scaled
+  "If a 'flat' storage representation is in use, pointer offsets have to be scaled
    by the size of the object pointed to."
   (if (not (zctype>pointer-p type))
       offset
     (zcprim>* offset (zctype>sizeof-in-scale (zctype>pointer-deref-type type) env))))
 
 (defun zcprim>unscale-ptr-difference (difference type env)
-  "If a /"flat/" storage representation is in use, pointer subtraction has to divide
+  "If a 'flat' storage representation is in use, pointer subtraction has to divide
    the result by the size of the object pointed to."
   (if (not (zctype>pointer-p type))
       difference
@@ -2407,7 +2396,7 @@
 	      (symbolp (cadr exp)) (numberp (caddr exp)))
 	 (values exp `(+ ,(cadr exp) ,(1+ (caddr exp))) nil))
 	(t
-	 (let ((temp (zcprim>gen-var)))
+	 (let ((temp (gen-var)))
 	   (values temp `(+ ,temp 1) `((,temp ,exp)))))))
 
 (defun increment-optimization (form)
@@ -2731,7 +2720,7 @@
   (if (or (zctype>arith-pointer-p type) (zctype>struct-p type))
       ;; Prevent CONS D-IGNORE instructions.
       (nlet ((let-clauses array index conses-p
-			  (zcprim>analyze-pointer-exp exp type)))
+			  (analyze-pointer-exp exp type)))
 	(if conses-p
 	    (if let-clauses
 		(if (and (eq array (caar let-clauses))
@@ -2834,7 +2823,7 @@
       (append outer (ncons-n inner (if (= maxdepth 1) 1 (1- maxdepth)))))))
 
 (defun ncons-n (x depth)
-  (if ( depth 0) x (ncons-n (ncons x) (1- depth))))
+  (if (<= depth 0) x (ncons-n (ncons x) (1- depth))))
 
 (defun zcprim>nlet-clause-max-depth (clauses)
   (cond ((null clauses) 0)
@@ -2847,7 +2836,7 @@
   (declare (values exp-or-temp nlet-clauses))
   (if (zcprim>trivial-p exp)
       (values exp nil)
-    (let ((temp-var (zcprim>gen-var)))
+    (let ((temp-var (gen-var)))
       (values temp-var `((,temp-var ,exp))))))
 
 (defun zcprim>trivial-p (exp)
@@ -2864,34 +2853,13 @@
   (if (null clauses) body-form
     `(nlet ,clauses ,body-form)))
 
-#-Genera
-(push '(zcprim>let-form 1 1) zwei:*lisp-indent-offset-alist*)
-#+Genera
-(puthash 'zcprim>let-form '(1 1) zwei:*lisp-indentation-offset-hash-table*)
-
-; This stuff is so I can tell my gensyms from the Lisp compiler's.
-(defvar zcprim>*var-gensym-counter* 0)
-(defvar zcprim>*label-gensym-counter* 0)
-
-(defun zcprim>gen-var ()
+(defun gen-var ()
   "Makes and returns a gensym for use as a temporary local variable."
-  (nlet ((#+Symbolics si:*gensym-prefix #-Symbolics si:*gensym-prefix* #/V)
-	 (#+Symbolics si:*gensym-counter #-Symbolics si:*gensym-counter*
-	  zcprim>*var-gensym-counter*)
-	 ((symbol (gensym))))
-    (setq zcprim>*var-gensym-counter* #+Symbolics si:*gensym-counter
-				      #-Symbolics si:*gensym-counter*)
-    symbol))
+  (gensym "TMPVAR-"))
 
-(defun zcprim>gen-label ()
+(defun gen-label ()
   "Makes and returns a gensym for use as a PROG-label."
-  (nlet ((#+Symbolics si:*gensym-prefix #-Symbolics si:*gensym-prefix* #/L)
-	 (#+Symbolics si:*gensym-counter #-Symbolics si:*gensym-counter*
-	  zcprim>*label-gensym-counter*)
-	 ((symbol (gensym))))
-    (setq zcprim>*label-gensym-counter* #+Symbolics si:*gensym-counter
-					#-Symbolics si:*gensym-counter*)
-    symbol))
+  (gensym "TMPLABEL-"))
 
 ; Forms whose CARs are the following are invertible by SETF and LOCF,
 ; and therefore are candidates for lvalues.  We maintain our own database
@@ -2907,6 +2875,3 @@
 (defprop zcptr>load t zcprim>lvalue-form)
 
 (defprop zcptr>flat-deref t zcprim>lvalue-form)
-
-
-; End of ZCPRIM.LISP
