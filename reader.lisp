@@ -17,20 +17,24 @@
     (decf *line-number*))
   (unread-char c stream))
 
+(defmacro loop-read (stream &body body)
+  `(loop with c do (setf c (c-read-char ,stream))
+        ,@body))
+
 (defun skip-whitespace (stream)
-  (loop with c do (setf c (c-read-char stream))
-        while (member c '(#\Space #\Tab #\Newline))
-        finally (return c)))
+  (loop-read stream
+     while (member c '(#\Space #\Tab #\Newline))
+     finally (return c)))
 
 (defun make-peek-buffer ()
   (make-array '(3) :adjustable t :fill-pointer 0 :element-type 'character))
 
 (defun slurp-while (stream predicate)
   (let ((peek-buffer (make-peek-buffer)))
-    (loop with c do (setf c (c-read-char stream))
-          while (funcall predicate c)
-          do (vector-push-extend c peek-buffer)
-          finally (c-unread-char c stream))
+    (loop-read stream
+       while (funcall predicate c)
+       do (vector-push-extend c peek-buffer)
+       finally (c-unread-char c stream))
     peek-buffer))
 
 ;;; error reporting
@@ -54,38 +58,40 @@
 (defun read-hex (stream)
   (parse-integer (slurp-while stream (lambda (c) (or (char<= #\0 c #\9) (char-not-greaterp #\A c #\F)))) :radix 16))
 
-(defun read-decimal (stream)
+(defun read-decimal (stream) ;; sooo broken
   (labels ((digit-value (c) (- (char-code c) 48))
            (read-float-exponent (value)
              (let ((exp 0))
-               (loop with c do (setf c (c-read-char stream))
-                  (unless (char<= #\0 c #\9)
-                    (c-unread-char c stream)
-                    (return (* value (expt 10 exp))))
-                  (setf exp (+ (digit-value c) (* 10 exp))))))
+               (loop-read stream
+                    (unless (char<= #\0 c #\9)
+                      (c-unread-char c stream)
+                      (return (* value (expt 10 exp))))
+                    (setf exp (+ (digit-value c) (* 10 exp))))))
            (read-float-fraction (value)
              (let ((mult 0.1))
-               (loop with c do (setf c (c-read-char stream))
-                  (unless (char<= #\0 c #\9)
-                    (return (if (member c '(#\e #\E #\d #\D))
-                                (read-float-exponent value)
-                                (progn (c-unread-char c stream) value))))
-                  (setf value (+ value (* mult (digit-value c)))
-                        mult (/ mult 10.0))))))
+               (loop-read stream
+                    (unless (char<= #\0 c #\9)
+                      (return (if (char-equal c #\E)
+                                  (read-float-exponent value)
+                                  (progn (c-unread-char c stream) value))))
+                    (setf value (+ value (* mult (digit-value c)))
+                          mult (/ mult 10.0))))))
     (let ((value 0))
-      (loop with c do (setf c (c-read-char stream))
-         (cond ((char<= #\0 c #\9) (setf value (+ (* 10 value) (digit-value c))))
-               ((char= c #\.) (return (read-float-fraction value)))
-               ((member c '(#\e #\E #\d #\D)) (return (read-float-exponent value)))
-               (t (return (progn (c-unread-char c stream) value))))))))
+      (loop-read stream
+           (cond ((char<= #\0 c #\9) (setf value (+ (* 10 value) (digit-value c))))
+                 ((char= c #\.) (return (read-float-fraction value)))
+                 ((char-equal c #\E) (return (read-float-exponent value)))
+                 (t (return (progn (c-unread-char c stream) value))))))))
 
 (defun read-c-number (stream c) ;; todo: need to discard suffixes
-  (if (char= c #\0)
-      (case (peek-char nil stream)
-        ((#\X #\x) (c-read-char stream) (read-hex stream))
-        (#\. (c-unread-char c stream) (read-decimal stream))
-        (otherwise (read-octal stream)))
-      (progn (c-unread-char c stream) (read-decimal stream))))
+  (prog1 (if (char= c #\0)
+             (case (peek-char nil stream)
+               ((#\X #\x) (c-read-char stream) (read-hex stream))
+               (#\. (c-unread-char c stream) (read-decimal stream))
+               (otherwise (read-octal stream)))
+             (progn (c-unread-char c stream) (read-decimal stream)))
+    (loop repeat 2 do (when (find (peek-char nil stream) "ulf" :test #'char-equal)
+                        (c-read-char stream)))))
 
 ;;; string and chars (caller has to remember to discard leading #\L!!!)
 
@@ -112,10 +118,10 @@
 
 (defun read-c-string (stream)
   (let ((string (make-peek-buffer)))
-    (loop with c do (setf c (c-read-char stream))
-       (if (char= c #\") ;; c requires concatenation of adjacent string literals, retardo
-           (progn (setf c (skip-whitespace stream))
-                  (unless (char= c #\")
-                    (c-unread-char c stream)
-                    (return string)))
-           (vector-push-extend (read-char-literal stream c) string)))))
+    (loop-read stream
+         (if (char= c #\") ;; c requires concatenation of adjacent string literals, retardo
+             (progn (setf c (skip-whitespace stream))
+                    (unless (char= c #\")
+                      (c-unread-char c stream)
+                      (return string)))
+             (vector-push-extend (read-char-literal stream c) string)))))
