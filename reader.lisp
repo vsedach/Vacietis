@@ -33,10 +33,6 @@
           finally (c-unread-char c stream))
     peek-buffer))
 
-(defun reset-peek-buffer ()
-  (prog1 (copy-seq *peek-buffer*)
-    (setf (fill-pointer *peek-buffer*) 0)))
-
 ;;; error reporting
 
 (define-condition c-reader-error (reader-error simple-error)
@@ -56,7 +52,7 @@
   (parse-integer (slurp-while stream (lambda (c) (char<= #\0 c #\7))) :radix 8))
 
 (defun read-hex (stream)
-  (parse-integer (slurp-while stream (lambda (c) (or (char<= #\0 c #9) (char-not-greaterp #\A c #\F)))) :radix 16))
+  (parse-integer (slurp-while stream (lambda (c) (or (char<= #\0 c #\9) (char-not-greaterp #\A c #\F)))) :radix 16))
 
 (defun read-decimal (stream)
   (labels ((digit-value (c) (- (char-code c) 48))
@@ -112,7 +108,7 @@
 (defun read-character-constant (stream)
   (prog1 (read-char-literal stream (c-read-char stream))
     (unless (char= (c-read-char stream) #\')
-      (read-error "Junk in character constant"))))
+      (read-error stream "Junk in character constant"))))
 
 (defun read-c-string (stream)
   (let ((string (make-peek-buffer)))
