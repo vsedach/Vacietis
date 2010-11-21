@@ -10,4 +10,5 @@
    (:static-file "vacietis.test.asd")
    (:file "package")
    (:file "pointers")
-   (:file "reader")))
+   (:file "reader"))
+  :depends-on (:parse-number))

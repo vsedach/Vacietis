@@ -2,11 +2,11 @@
 
 ;;; basic stream stuff
 
-(defvar *line-number*)
-(defvar *column*)
+(defvar *line-number* 0)
+(defvar *column* 0)
 
 (defun c-read-char (stream)
-  (let ((c (read-char stream)))
+  (let ((c (read-char stream nil (code-char 0))))
     (if (eql c #\Newline)
         (progn (incf *line-number*) (setf *column* 0))
         (incf *column*))
@@ -17,13 +17,20 @@
     (decf *line-number*))
   (unread-char c stream))
 
+(defun c-read-line (stream)
+  (incf *line-number*)
+  (read-line stream))
+
 (defmacro loop-read (stream &body body)
   `(loop with c do (setf c (c-read-char ,stream))
         ,@body))
 
+(defun whitespace? (c)
+  (or (char= c #\Space) (char= c #\Tab) (char= c #\Newline)))
+
 (defun skip-whitespace (stream)
   (loop-read stream
-     while (member c '(#\Space #\Tab #\Newline))
+     while (whitespace? c)
      finally (return c)))
 
 (defun make-peek-buffer ()
@@ -58,32 +65,20 @@
 (defun read-hex (stream)
   (parse-integer (slurp-while stream (lambda (c) (or (char<= #\0 c #\9) (char-not-greaterp #\A c #\F)))) :radix 16))
 
-(defun read-decimal (stream) ;; sooo broken
-  (labels ((digit-value (c) (- (char-code c) 48))
-           (read-float-exponent (value)
-             (let ((exp 0))
-               (loop-read stream
-                    (unless (char<= #\0 c #\9)
-                      (c-unread-char c stream)
-                      (return (* value (expt 10 exp))))
-                    (setf exp (+ (digit-value c) (* 10 exp))))))
-           (read-float-fraction (value)
-             (let ((mult 0.1))
-               (loop-read stream
-                    (unless (char<= #\0 c #\9)
-                      (return (if (char-equal c #\E)
-                                  (read-float-exponent value)
-                                  (progn (c-unread-char c stream) value))))
-                    (setf value (+ value (* mult (digit-value c)))
-                          mult (/ mult 10.0))))))
+(defun read-float (prefix separator stream)
+  (parse-number:parse-number
+   (format nil "~d~a~a" prefix separator
+           (slurp-while stream (lambda (c) (find c "0123456789+-eE" :test #'char=))))))
+
+(defun read-decimal (stream)
+  (labels ((digit-value (c) (- (char-code c) 48)))
     (let ((value 0))
       (loop-read stream
            (cond ((char<= #\0 c #\9) (setf value (+ (* 10 value) (digit-value c))))
-                 ((char= c #\.) (return (read-float-fraction value)))
-                 ((char-equal c #\E) (return (read-float-exponent value)))
+                 ((or (char-equal c #\E) (char= c #\.)) (return (read-float value c stream)))
                  (t (return (progn (c-unread-char c stream) value))))))))
 
-(defun read-c-number (stream c) ;; todo: need to discard suffixes
+(defun read-c-number (stream c)
   (prog1 (if (char= c #\0)
              (case (peek-char nil stream)
                ((#\X #\x) (c-read-char stream) (read-hex stream))
@@ -125,3 +120,66 @@
                       (c-unread-char c stream)
                       (return string)))
              (vector-push-extend (read-char-literal stream c) string)))))
+
+;;; keywords
+
+(defvar *keywords* '("auto" "break" "case" "char" "const" "continue" "default" "do" "double" "else" "enum" "extern" "float" "for" "goto" "if" "inline" "int" "long" "register" "restrict" "return" "short" "signed" "sizeof" "static" "struct" "switch" "typedef" "union" "unsigned" "void" "volatile" "while" "_Bool" "_Complex" "_Imaginary"))
+
+;;; preprocessor
+
+(defvar *in-preprocessor-p* nil)
+(defvar *in-preprocessor-conditional-p* nil)
+(defvar *preprocessor-eval-p* t)
+
+(defun preprocessor-include (stream)
+  (let ((file (c-read-line stream)))
+    (when *preprocessor-eval-p*
+      (c-read (c-file-stream file) t))))
+
+(defun preprocessor-if-test (test-str)
+  (not (eql 0 (eval test-str)))) ;; HALP
+
+(defun preprocessor-if (stream)
+  (let* ((*in-preprocessor-conditional-p* t)
+         (test (c-read-line stream))
+         (*preprocessor-eval-p* (when *preprocessor-eval-p* (preprocessor-if-test test))))
+    (c-read-macro stream)))
+
+
+
+(defun c-read-macro (stream)
+  (let ((operator (slurp-while stream (complement #'whitespace?))))
+    (cond ((string= operator "#include")
+           (preprocessor-include stream))
+          ((string= operator "#if")
+           (preprocessor-if stream))
+          ((string= operator "#endif")
+           (when (not *in-preprocessor-conditional-p*)
+             (read-error stream "Misplaced #endif"))))))
+
+;;; reader
+
+(defvar *c-read-accumulator* ())
+
+(defun c-read (stream &optional recursive-p)
+  (let ((*in-preprocessor-p* nil)
+        (*in-preprocessor-conditional-p* nil)
+        (*preprocessor-eval-p* t)
+        (*c-read-accumulator* (if recursive-p *c-read-accumulator* ()))
+        (c (skip-whitespace stream)))
+    (c-unread-char c stream)
+    (case c
+      (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
+             (c-read-macro stream)))
+      (#\/ (c-read-char stream) ;; comment
+           (case (c-read-char stream)
+             (#\/ (c-read-line stream))
+             (#\* (slurp-while stream
+                               (let ((previous-char (code-char 0)))
+                                 (lambda (c)
+                                   (prog1 (not (and (char= previous-char #\*)
+                                                    (char= c #\/)))
+                                     (setf previous-char c)))))
+                  (c-read-char stream))
+             (otherwise (read-error stream "Expected comment")))))
+    (reverse *c-read-accumulator*)))
