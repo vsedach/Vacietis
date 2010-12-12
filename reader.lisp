@@ -1,4 +1,5 @@
 (in-package #:reader.vacietis)
+(in-readtable vacietis)
 
 ;;; basic stream stuff
 
@@ -111,7 +112,8 @@
     (unless (char= (c-read-char stream) #\')
       (read-error stream "Junk in character constant"))))
 
-(defun read-c-string (stream)
+(defun read-c-string (stream c1)
+  (declare (ignore c1))
   (let ((string (make-peek-buffer)))
     (loop-read stream
          (if (char= c #\") ;; c requires concatenation of adjacent string literals, retardo
@@ -131,44 +133,43 @@
 (defvar *in-preprocessor-conditional-p* nil)
 (defvar *preprocessor-eval-p* t)
 
-(defun preprocessor-include (stream)
-  (let ((file (c-read-line stream)))
-    (when *preprocessor-eval-p*
-      (c-read (c-file-stream file) t))))
-
 (defun preprocessor-if-test (test-str)
   (not (eql 0 (eval test-str)))) ;; HALP
 
-(defun preprocessor-if (stream)
-  (let* ((*in-preprocessor-conditional-p* t)
-         (test (c-read-line stream))
-         (*preprocessor-eval-p* (when *preprocessor-eval-p* (preprocessor-if-test test))))
-    (c-read-macro stream)))
-
-
-
 (defun c-read-macro (stream)
-  (let ((operator (slurp-while stream (complement #'whitespace?))))
-    (cond ((string= operator "#include")
-           (preprocessor-include stream))
-          ((string= operator "#if")
-           (preprocessor-if stream))
-          ((string= operator "#endif")
-           (when (not *in-preprocessor-conditional-p*)
-             (read-error stream "Misplaced #endif"))))))
+  (let ((pp-directive (read stream t nil t)))
+    (case pp-directive
+      (include
+       (skip-whitespace stream)
+       (let ((delimiter (case (c-read-char stream)
+                          (#\" #\") (#\< #\>)
+                          (otherwise (read-error stream "Error reading include path: ~A" (c-read-line stream))))))
+         (let ((file (slurp-while stream (lambda (c) (char/= c delimiter)))))
+           (when *preprocessor-eval-p*
+             (c-read (c-file-stream file) t)))))
+      (if
+       (let* ((*in-preprocessor-conditional-p* t)
+              (test (c-read-line stream))
+              (*preprocessor-eval-p* (when *preprocessor-eval-p* (preprocessor-if-test test))))
+         (c-read-macro stream)))
+      (endif
+       (when (not *in-preprocessor-conditional-p*)
+         (read-error stream "Misplaced #endif")))
+      (otherwise
+       (read-error stream "Unknown preprocessor directive #~A" pp-directive)))))
 
 ;;; reader
 
-(defvar *c-read-accumulator* ())
-
 (defun c-read (stream &optional recursive-p)
-  (let ((*in-preprocessor-p* nil)
+  (let ((*readtable* (find-readtable c-readtable))
+        (*in-preprocessor-p* nil)
         (*in-preprocessor-conditional-p* nil)
         (*preprocessor-eval-p* t)
-        (*c-read-accumulator* (if recursive-p *c-read-accumulator* ()))
         (c (skip-whitespace stream)))
-    (c-unread-char c stream)
-    (case c
+    (read stream )))
+
+(defun c-read-exp (stream c)
+  (case c
       (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
              (c-read-macro stream)))
       (#\/ (c-read-char stream) ;; comment
@@ -181,5 +182,19 @@
                                                     (char= c #\/)))
                                      (setf previous-char c)))))
                   (c-read-char stream))
-             (otherwise (read-error stream "Expected comment")))))
-    (reverse *c-read-accumulator*)))
+             (otherwise (read-error stream "Expected comment"))))
+      (#\{ (cons 'c-progn (read-delimited-list #\} stream t)))
+      (#\[ (cons 'c-aref (read-delimited-list #\] stream t)))))
+
+;;; readtable
+
+(defreadtable c-readtable
+  (:merge :standard)
+  (:case :invert)
+
+  (:macro-char #\{ 'c-read-exp nil) (:syntax-from :standard  #\) #\})
+
+  (:macro-char #\[ 'c-read-exp nil) (:syntax-from :standard #\) #\])
+
+  (:macro-char #\" 'read-c-string nil)
+  )
