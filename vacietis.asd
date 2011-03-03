@@ -3,7 +3,7 @@
 (defsystem :vacietis
   :name "vacietis"
   :author "Vladimir Sedach <vsedach@gmail.com>"
-  :licence "LLGPL"
+  :licence "LLGPLv3"
   :serial t
   :components
   ((:static-file "vacietis.asd")
