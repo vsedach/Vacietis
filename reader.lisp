@@ -1,4 +1,4 @@
-(in-package #:reader.vacietis)
+(in-package #:vacietis.reader)
 (in-readtable vacietis)
 
 ;;; basic stream stuff
@@ -7,7 +7,7 @@
 (defvar *column* 0)
 
 (defun c-read-char (stream)
-  (let ((c (read-char stream nil (code-char 0))))
+  (let ((c (read-char stream nil 'end)))
     (if (eql c #\Newline)
         (progn (incf *line-number*) (setf *column* 0))
         (incf *column*))
@@ -29,7 +29,7 @@
 (defun whitespace? (c)
   (or (char= c #\Space) (char= c #\Tab) (char= c #\Newline)))
 
-(defun skip-whitespace (stream)
+(defun read-char-skipping-spaces (stream)
   (loop-read stream
      while (whitespace? c)
      finally (return c)))
@@ -75,9 +75,10 @@
   (labels ((digit-value (c) (- (char-code c) 48)))
     (let ((value 0))
       (loop-read stream
-           (cond ((char<= #\0 c #\9) (setf value (+ (* 10 value) (digit-value c))))
+           (cond ((eq c 'end) (return value))
+                 ((char<= #\0 c #\9) (setf value (+ (* 10 value) (digit-value c))))
                  ((or (char-equal c #\E) (char= c #\.)) (return (read-float value c stream)))
-                 (t (return (progn (c-unread-char c stream) value))))))))
+                 (t (c-unread-char c stream) (return value)))))))
 
 (defun read-c-number (stream c)
   (prog1 (if (char= c #\0)
@@ -86,7 +87,7 @@
                (#\. (c-unread-char c stream) (read-decimal stream))
                (otherwise (read-octal stream)))
              (progn (c-unread-char c stream) (read-decimal stream)))
-    (loop repeat 2 do (when (find (peek-char nil stream) "ulf" :test #'char-equal)
+    (loop repeat 2 do (when (find (peek-char nil stream nil nil) "ulf" :test #'eql)
                         (c-read-char stream)))))
 
 ;;; string and chars (caller has to remember to discard leading #\L!!!)
@@ -117,7 +118,7 @@
   (let ((string (make-peek-buffer)))
     (loop-read stream
          (if (char= c #\") ;; c requires concatenation of adjacent string literals, retardo
-             (progn (setf c (skip-whitespace stream))
+             (progn (setf c (read-char-skipping-spaces stream))
                     (unless (char= c #\")
                       (c-unread-char c stream)
                       (return string)))
@@ -136,65 +137,72 @@
 (defun preprocessor-if-test (test-str)
   (not (eql 0 (eval test-str)))) ;; HALP
 
-(defun c-read-macro (stream)
-  (let ((pp-directive (read stream t nil t)))
-    (case pp-directive
-      (include
-       (skip-whitespace stream)
-       (let ((delimiter (case (c-read-char stream)
-                          (#\" #\") (#\< #\>)
-                          (otherwise (read-error stream "Error reading include path: ~A" (c-read-line stream))))))
-         (let ((file (slurp-while stream (lambda (c) (char/= c delimiter)))))
-           (when *preprocessor-eval-p*
-             (c-read (c-file-stream file) t)))))
-      (if
-       (let* ((*in-preprocessor-conditional-p* t)
-              (test (c-read-line stream))
-              (*preprocessor-eval-p* (when *preprocessor-eval-p* (preprocessor-if-test test))))
-         (c-read-macro stream)))
-      (endif
-       (when (not *in-preprocessor-conditional-p*)
-         (read-error stream "Misplaced #endif")))
-      (otherwise
-       (read-error stream "Unknown preprocessor directive #~A" pp-directive)))))
+;; (defun read-c-macro (stream)
+;;   (let ((pp-directive (read stream t nil t)))
+;;     (case pp-directive
+;;       (include
+;;        (read-char-skipping-spaces stream)
+;;        (let ((delimiter (case (c-read-char stream)
+;;                           (#\" #\") (#\< #\>)
+;;                           (otherwise (read-error stream "Error reading include path: ~A" (c-read-line stream))))))
+;;          (let ((file (slurp-while stream (lambda (c) (char/= c delimiter)))))
+;;            (when *preprocessor-eval-p*
+;;              (c-read (c-file-stream file) t)))))
+;;       (if
+;;        (let* ((*in-preprocessor-conditional-p* t)
+;;               (test (c-read-line stream))
+;;               (*preprocessor-eval-p* (when *preprocessor-eval-p* (preprocessor-if-test test))))
+;;          (read-c-macro stream)))
+;;       (endif
+;;        (when (not *in-preprocessor-conditional-p*)
+;;          (read-error stream "Misplaced #endif")))
+;;       (otherwise
+;;        (read-error stream "Unknown preprocessor directive #~A" pp-directive)))))
 
 ;;; reader
 
-(defun c-read (stream &optional recursive-p)
-  (let ((*readtable* (find-readtable c-readtable))
-        (*in-preprocessor-p* nil)
-        (*in-preprocessor-conditional-p* nil)
-        (*preprocessor-eval-p* t)
-        (c (skip-whitespace stream)))
-    (read stream )))
+;; (defun c-read (stream &optional recursive-p)
+;;   (let ((*readtable* (find-readtable 'c-readtable))
+;;         (*in-preprocessor-p* nil)
+;;         (*in-preprocessor-conditional-p* nil)
+;;         (*preprocessor-eval-p* t)
+;;         (c (read-char-skipping-spaces stream)))
+;;     (read stream )))
 
-(defun c-read-exp (stream c)
+(defun read-c-exp (stream c)
   (case c
-      (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
-             (c-read-macro stream)))
-      (#\/ (c-read-char stream) ;; comment
-           (case (c-read-char stream)
-             (#\/ (c-read-line stream))
-             (#\* (slurp-while stream
-                               (let ((previous-char (code-char 0)))
-                                 (lambda (c)
-                                   (prog1 (not (and (char= previous-char #\*)
-                                                    (char= c #\/)))
-                                     (setf previous-char c)))))
-                  (c-read-char stream))
-             (otherwise (read-error stream "Expected comment"))))
-      (#\{ (cons 'c-progn (read-delimited-list #\} stream t)))
-      (#\[ (cons 'c-aref (read-delimited-list #\] stream t)))))
+    (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
+           (read-c-macro stream)))
+    (#\/ (c-read-char stream) ;; comment
+         (case (c-read-char stream)
+           (#\/ (c-read-line stream))
+           (#\* (slurp-while stream
+                             (let ((previous-char (code-char 0)))
+                               (lambda (c)
+                                 (prog1 (not (and (char= previous-char #\*)
+                                                  (char= c #\/)))
+                                   (setf previous-char c)))))
+                (c-read-char stream))
+           (otherwise (read-error stream "Expected comment"))))
+    (#\{ (cons 'c-progn (read-delimited-list #\} stream t)))
+    (#\[ (cons 'c-aref (read-delimited-list #\] stream t)))))
 
 ;;; readtable
 
-(defreadtable c-readtable
-  (:merge :standard)
-  (:case :invert)
+(macrolet
+    ((def-c-readtable ()
+       `(defreadtable c-readtable
+         (:merge :standard)
+         (:case :invert)
 
-  (:macro-char #\{ 'c-read-exp nil) (:syntax-from :standard  #\) #\})
+         (:macro-char #\{ 'read-c-exp nil) (:syntax-from :standard  #\) #\})
 
-  (:macro-char #\[ 'c-read-exp nil) (:syntax-from :standard #\) #\])
+         (:macro-char #\[ 'read-c-exp nil) (:syntax-from :standard #\) #\])
 
-  (:macro-char #\" 'read-c-string nil)
-  )
+         (:macro-char #\" 'read-c-string nil)
+
+         (:macro-char #\# 'read-c-macro nil)
+
+         ,@(loop for i from 0 upto 9 collect `(:macro-char ,(digit-char i) 'read-c-number nil))
+         )))
+  (def-c-readtable))

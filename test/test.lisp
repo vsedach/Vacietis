@@ -14,7 +14,7 @@
       (equal x y)))
 
 (defmacro reader-test (name input s-exp)
-  `(test ,testname ()
+  `(test ,name ()
      (is (case-sensitive-equalp
           ',s-exp
           (let ((*readtable* (find-readtable 'c-readtable)))

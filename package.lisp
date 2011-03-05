@@ -3,7 +3,8 @@
 (defpackage #:vacietis
   (:use #:cl #:named-readtables)
   (:export
-   #:vacietis))
+   #:vacietis
+   #:c-readtable))
 
 (in-package #:vacietis)
 
@@ -11,5 +12,5 @@
   (:merge :standard)
   (:case :invert))
 
-(defpackage #:reader.vacietis
+(defpackage #:vacietis.reader
   (:use #:cl #:vacietis #:named-readtables))
