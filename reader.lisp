@@ -40,9 +40,9 @@
 (defun slurp-while (stream predicate)
   (let ((peek-buffer (make-peek-buffer)))
     (loop-read stream
-       while (funcall predicate c)
+       while (and (not (eq c 'end)) (funcall predicate c))
        do (vector-push-extend c peek-buffer)
-       finally (c-unread-char c stream))
+       finally (unless (eq c 'end) (c-unread-char c stream)))
     peek-buffer))
 
 ;;; error reporting
@@ -67,9 +67,10 @@
   (parse-integer (slurp-while stream (lambda (c) (or (char<= #\0 c #\9) (char-not-greaterp #\A c #\F)))) :radix 16))
 
 (defun read-float (prefix separator stream)
-  (parse-number:parse-number
-   (format nil "~d~a~a" prefix separator
-           (slurp-while stream (lambda (c) (find c "0123456789+-eE" :test #'char=))))))
+  (let ((*readtable* (find-readtable :common-lisp)))
+    (read-from-string
+     (format nil "~d~a~a" prefix separator
+             (slurp-while stream (lambda (c) (find c "0123456789+-eE" :test #'char=)))))))
 
 (defun read-decimal (stream)
   (labels ((digit-value (c) (- (char-code c) 48)))
