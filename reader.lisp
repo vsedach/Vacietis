@@ -4,17 +4,15 @@
 ;;; basic stream stuff
 
 (defvar *line-number* 0)
-(defvar *column* 0)
 
 (defun c-read-char (stream)
   (let ((c (read-char stream nil 'end)))
-    (if (eql c #\Newline)
-        (progn (incf *line-number*) (setf *column* 0))
-        (incf *column*))
+    (when (eql c #\Newline)
+      (incf *line-number*))
     c))
 
 (defun c-unread-char (c stream)
-  (when (eql c #\Newline) ;; what do we do about column counts?
+  (when (eql c #\Newline)
     (decf *line-number*))
   (unread-char c stream))
 
@@ -48,15 +46,14 @@
 ;;; error reporting
 
 (define-condition c-reader-error (reader-error simple-error)
-  ((line-number :reader line-number :initarg :line-number)
-   (column :reader column :initarg :column))
-  (:default-initargs :line-number *line-number* :column *column*))
+  ((line-number :reader line-number :initarg :line-number))
+  (:default-initargs :line-number *line-number*))
 
 (defun read-error (stream msg &rest args)
   (error (make-condition 'c-reader-error
                          :stream stream
-                         :format-control (format nil "Error reading from C stream (line ~a, column ~a): ~?"
-                                                 *line-number* *column* msg args))))
+                         :format-control (format nil "Error reading from C stream at line ~a: ~?"
+                                                 *line-number* msg args))))
 
 ;;; numbers
 
