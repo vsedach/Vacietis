@@ -1,6 +1,18 @@
 (in-package #:vacietis.reader)
 (in-readtable vacietis)
 
+;;; error reporting
+
+(define-condition c-reader-error (reader-error simple-error)
+  ((line-number :reader line-number :initarg :line-number))
+  (:default-initargs :line-number *line-number*))
+
+(defun read-error (stream msg &rest args)
+  (error (make-condition 'c-reader-error
+                         :stream stream
+                         :format-control (format nil "Error reading from C stream at line ~a: ~?"
+                                                 *line-number* msg args))))
+
 ;;; basic stream stuff
 
 (defvar *line-number* 0)
@@ -27,9 +39,12 @@
 (defun whitespace? (c)
   (or (char= c #\Space) (char= c #\Tab) (char= c #\Newline)))
 
-(defun read-char-skipping-spaces (stream)
+(defun read-char-skipping-spaces (stream eof-error?)
   (loop-read stream
-     while (whitespace? c)
+     while (if (eq 'end c)
+               (when eof-error?
+                 (read-error stream "Unexpected end of file"))
+               (whitespace? c))
      finally (return c)))
 
 (defun make-peek-buffer ()
@@ -42,18 +57,6 @@
        do (vector-push-extend c peek-buffer)
        finally (unless (eq c 'end) (c-unread-char c stream)))
     peek-buffer))
-
-;;; error reporting
-
-(define-condition c-reader-error (reader-error simple-error)
-  ((line-number :reader line-number :initarg :line-number))
-  (:default-initargs :line-number *line-number*))
-
-(defun read-error (stream msg &rest args)
-  (error (make-condition 'c-reader-error
-                         :stream stream
-                         :format-control (format nil "Error reading from C stream at line ~a: ~?"
-                                                 *line-number* msg args))))
 
 ;;; numbers
 
@@ -116,9 +119,9 @@
   (let ((string (make-peek-buffer)))
     (loop-read stream
          (if (char= c #\") ;; c requires concatenation of adjacent string literals, retardo
-             (progn (setf c (read-char-skipping-spaces stream))
-                    (unless (char= c #\")
-                      (c-unread-char c stream)
+             (progn (setf c (read-char-skipping-spaces stream nil))
+                    (unless (eql c #\")
+                      (unless (eq c 'end) (c-unread-char c stream))
                       (return string)))
              (vector-push-extend (read-char-literal stream c) string)))))
 
@@ -166,6 +169,10 @@
 ;;         (*preprocessor-eval-p* t)
 ;;         (c (read-char-skipping-spaces stream)))
 ;;     (read stream )))
+
+(defun cread-str (str) ;; for development
+  (let ((*readtable* (find-readtable 'c-readtable)))
+    (read-from-string str)))
 
 (defun read-c-exp (stream c)
   (case c

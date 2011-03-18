@@ -9,3 +9,19 @@
 (reader-test float
   "12323.0"
   12323.0)
+
+(reader-test string1
+  "\"foo\""
+  "foo")
+
+(reader-test string2
+  "\"foo\" \"bar\""
+  "foobar")
+
+;; (reader-test unclosed-string
+;;   "\"foo")
+
+(reader-test string-escape1
+  "\"foo\\nbar\""
+  "foo
+bar")
