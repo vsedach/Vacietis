@@ -200,6 +200,8 @@
          (:merge :standard)
          (:case :invert)
 
+         (:syntax-from :standard #\Space #\,)
+
          (:macro-char #\{ 'read-c-exp nil) (:syntax-from :standard  #\) #\})
 
          (:macro-char #\[ 'read-c-exp nil) (:syntax-from :standard #\) #\])

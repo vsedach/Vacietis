@@ -25,3 +25,7 @@
   "\"foo\\nbar\""
   "foo
 bar")
+
+(reader-test arglist1
+  "(int x, int y)"
+  (int x int y))
