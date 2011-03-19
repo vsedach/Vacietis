@@ -29,3 +29,19 @@ bar")
 (reader-test arglist1
   "(int x, int y)"
   (int x int y))
+
+(reader-test decrement1
+  "--foo"
+  (vacietis.c.operators:-- foo))
+
+(reader-test identifier1
+  "_foo"
+  _foo)
+
+(reader-test identifier2
+  "bar_foo"
+  bar_foo)
+
+(reader-test identifier3
+  "bar_foo99"
+  bar_foo99)

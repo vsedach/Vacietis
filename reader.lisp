@@ -174,23 +174,33 @@
   (let ((*readtable* (find-readtable 'c-readtable)))
     (read-from-string str)))
 
+(defun read-c-identifier (stream c)
+  (unread-char c stream)
+  (let ((*readtable* (find-readtable 'vacietis))) ;; for invert/preserve
+    (read-from-string (slurp-while stream (lambda (c) (or (eql c #\_) (alphanumericp c)))))))
+
 (defun read-c-exp (stream c)
-  (case c
-    (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
-           (read-c-macro stream)))
-    (#\/ (c-read-char stream) ;; comment
-         (case (c-read-char stream)
-           (#\/ (c-read-line stream))
-           (#\* (slurp-while stream
-                             (let ((previous-char (code-char 0)))
-                               (lambda (c)
-                                 (prog1 (not (and (char= previous-char #\*)
-                                                  (char= c #\/)))
-                                   (setf previous-char c)))))
-                (c-read-char stream))
-           (otherwise (read-error stream "Expected comment"))))
-    (#\{ (cons 'c-progn (read-delimited-list #\} stream t)))
-    (#\[ (cons 'c-aref (read-delimited-list #\] stream t)))))
+  (if (or (eql c #\_) (alpha-char-p c))
+      (read-c-identifier stream c)
+      (case c
+        (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
+               (read-c-macro stream)))
+        (#\/ (c-read-char stream) ;; comment
+             (case (c-read-char stream)
+               (#\/ (c-read-line stream))
+               (#\* (slurp-while stream
+                                 (let ((previous-char (code-char 0)))
+                                   (lambda (c)
+                                     (prog1 (not (and (char= previous-char #\*)
+                                                      (char= c #\/)))
+                                       (setf previous-char c)))))
+                    (c-read-char stream))
+               (otherwise (read-error stream "Expected comment"))))
+        (#\{ (cons 'c-progn (read-delimited-list #\} stream t)))
+        (#\[ (cons 'c-aref (read-delimited-list #\] stream t)))
+        (#\- (if (eql (peek-char nil stream) #\-)
+                 (list '-- (read-c-exp stream (progn (c-read-char stream) (c-read-char stream))))
+                 '-)))))
 
 ;;; readtable
 
@@ -200,7 +210,9 @@
          (:merge :standard)
          (:case :invert)
 
-         (:syntax-from :standard #\Space #\,)
+         (:syntax-from :standard #\Space #\,) ;; this should be fun
+
+         (:macro-char #\- 'read-c-exp nil)
 
          (:macro-char #\{ 'read-c-exp nil) (:syntax-from :standard  #\) #\})
 
@@ -211,5 +223,9 @@
          (:macro-char #\# 'read-c-macro nil)
 
          ,@(loop for i from 0 upto 9 collect `(:macro-char ,(digit-char i) 'read-c-number nil))
+
+         (:macro-char #\_ 'read-c-identifier nil)
+         ,@(loop for i from (char-code #\a) upto (char-code #\z) collect `(:macro-char ,(code-char i) 'read-c-identifier nil))
+         ,@(loop for i from (char-code #\A) upto (char-code #\Z) collect `(:macro-char ,(code-char i) 'read-c-identifier nil))
          )))
   (def-c-readtable))
