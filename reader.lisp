@@ -216,15 +216,15 @@
 
 (defun read-variable (stream name)
   ;; have to deal with array declarations like *foo_bar[baz]
+  `(defvar ,name)
   )
 
 (defun read-declaration (stream token)
   (if (c-type? token)
       (read-declaration stream (next-exp stream)) ;; throw away type info
-      (let ((name (next-exp stream)))
-        (if (eql #\( (peek-char t stream))
-            (read-function stream name)
-            (read-variable stream name)))))
+      (if (eql #\( (peek-char t stream))
+          (read-function stream token)
+          (read-variable stream token))))
 
 (defun read-c-statement (stream c)
   (let ((next-token (read-c-exp stream c)))
@@ -238,8 +238,13 @@
 
 (defun read-c-identifier (stream c)
   (unread-char c stream)
-  (let ((*readtable* (find-readtable 'vacietis))) ;; for :invert/:preserve readtable-case
-    (read-from-string (slurp-while stream (lambda (c) (or (eql c #\_) (alphanumericp c)))))))
+  (let ((identifier-name (slurp-while stream (lambda (c) (or (eql c #\_) (alphanumericp c))))))
+    (when (eq (readtable-case (find-readtable 'vacietis)) :invert) ;; otherwise it better be :preserve!
+      (dotimes (i (length identifier-name))
+        (setf #1=(aref identifier-name i) (if (upper-case-p #1#)
+                                              (char-downcase #1#)
+                                              (char-upcase #1#)))))
+    (or (find-symbol identifier-name '#:vacietis.c) (intern identifier-name))))
 
 (defun read-c-exp (stream c)
   (cond ((digit-char-p c) (read-c-number stream c))
@@ -287,7 +292,7 @@
 
          ,@(loop for i from 0 upto 9 collect `(:macro-char ,(digit-char i) 'read-c-statement nil))
 
-         (:macro-char #\_ 'read-c-identifier nil)
+         (:macro-char #\_ 'read-c-statement nil)
          ,@(loop for i from (char-code #\a) upto (char-code #\z) collect `(:macro-char ,(code-char i) 'read-c-statement nil))
          ,@(loop for i from (char-code #\A) upto (char-code #\Z) collect `(:macro-char ,(code-char i) 'read-c-statement nil))
          )))

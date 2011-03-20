@@ -32,7 +32,7 @@ bar")
 
 (reader-test decrement1
   "--foo;"
-  (vacietis.c.operators:-- foo))
+  (vacietis.c:-- foo))
 
 (reader-test identifier1
   "_foo;"
@@ -57,3 +57,7 @@ bar")
 (reader-test if-foo1
   "if foo { 1 + 2; }"
   (if foo (progn (+ 1 2))))
+
+(reader-test int-var1
+  "int x;"
+  (defvar x))
