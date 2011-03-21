@@ -58,6 +58,31 @@ bar")
   "if foo { 1 + 2; }"
   (if foo (progn (+ 1 2))))
 
+(reader-test if-foo2
+  "if foo 1 + 2;"
+  (if foo (+ 1 2)))
+
 (reader-test int-var1
   "int x;"
   (defvar x))
+
+(reader-test simple-function1
+  "void foo(int a, int b) {
+a + b;
+}"
+  (defun foo (a b)
+    (progn (+ a b))))
+
+;; (reader-test function1
+;;   "extern int max(int a, int b)
+;; {
+;; return a > b ? a : b;
+;; }")
+
+;; (reader-test function2 ;; yes this is legal
+;;   "extern int max(a, b)
+;; int a, b;
+;; {
+;; return a > b ? a : b;
+;; }
+;; ")

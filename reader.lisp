@@ -39,7 +39,7 @@
 (defun whitespace? (c)
   (or (char= c #\Space) (char= c #\Tab) (char= c #\Newline)))
 
-(defun next-char (stream eof-error?)
+(defun next-char (stream &optional (eof-error? t))
   (loop-read stream
      while (if (eq 'end c)
                (when eof-error?
@@ -188,7 +188,7 @@
 (defun read-c-block (stream c)
   (if (eql c #\{)
       (cons 'progn
-            (loop with c do (setf c (next-char stream t))
+            (loop with c do (setf c (next-char stream))
                   until (eql c #\}) collect (read-c-statement stream c)))
       (read-error stream "Expected opening brace '{' but found '~A'" c)))
 
@@ -200,19 +200,27 @@
   (member identifier '(int static void const signed unsigned short long float double)))
 
 (defun next-exp (stream)
-  (read-c-exp stream (next-char stream t)))
+  (read-c-exp stream (next-char stream)))
 
 (defun read-control-flow-statement (stream statement)
   (case statement
     (if (list 'if
               (parse-infix (next-exp stream))
-              (let ((next-char (next-char stream t)))
+              (let ((next-char (next-char stream)))
                 (if (eql next-char #\{)
                     (read-c-block stream next-char)
                     (read-c-statement stream next-char)))))))
 
+(defun read-comma-separated-list (stream open-delimiter)
+  (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\}))))
+    (loop with c do (setf c (next-char stream))
+          until (eql c close-delimiter)
+          unless (eql #\, c) collect (read-c-exp stream c))))
+
 (defun read-function (stream name)
-  )
+  `(defun ,name ,(remove-if #'c-type? ;; do the right thing with type declarations
+                            (read-comma-separated-list stream (next-char stream)))
+     ,(read-c-block stream (next-char stream))))
 
 (defun read-variable (stream name)
   ;; have to deal with array declarations like *foo_bar[baz]
@@ -233,8 +241,8 @@
           ((control-flow-statement? next-token)
            (read-control-flow-statement stream next-token))
           (t (parse-infix (cons next-token
-                                (loop with c do (setf c (next-char stream t))
-                                   until (eql c #\;) collect (read-c-exp stream c))))))))
+                                (loop with c do (setf c (next-char stream))
+                                      until (eql c #\;) collect (read-c-exp stream c))))))))
 
 (defun read-c-identifier (stream c)
   (unread-char c stream)
@@ -281,10 +289,6 @@
          (:case :invert)
 
          (:macro-char #\- 'read-c-statement nil) (:macro-char #\* 'read-c-statement nil)
-
-         (:macro-char #\{ 'read-c-exp nil) (:syntax-from :standard  #\) #\})
-
-         (:macro-char #\[ 'read-c-exp nil) (:syntax-from :standard #\) #\])
 
          (:macro-char #\" 'read-c-string nil)
 
