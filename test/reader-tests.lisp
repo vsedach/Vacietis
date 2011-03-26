@@ -86,3 +86,17 @@ a + b;
 ;; return a > b ? a : b;
 ;; }
 ;; ")
+
+(reader-test function-call1
+  "printf(\"hello, world\n\");"
+  (printf "hello, world
+"))
+
+(reader-test lognot1
+  "foo = ~010;"
+  (setf foo (lognot 8)))
+
+(reader-test nequal1
+  "foo != 0x10;"
+  (vacietis.c:!= foo 16))
+

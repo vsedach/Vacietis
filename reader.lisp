@@ -176,6 +176,12 @@
 
 ;;; infix
 
+;; (defun find-highest-precedence-operator (args)
+;;   ((aref) (funcall) |.| -> ++ -- sizeof (lognot) (not) (address-of) (indirection) (cast) * / & + - << >> < > <= >= == != logand logxor logior logand logor elvis-if = += -= *= /= %= <<= >>= &= ^= )
+;;   (parse-infix before)
+;;   ()
+;;   (parse-infix after))
+
 (defun parse-infix (args)
   (if (listp args)
       (if (cdr args)
@@ -259,8 +265,8 @@
         ((or (eql c #\_) (alpha-char-p c)) (read-c-identifier stream c))
         (t
          (case c
-           (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
-                  (read-c-macro stream)))
+           ;; (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
+           ;;        (read-c-macro stream)))
            (#\/ (c-read-char stream) ;; comment
                 (case (c-read-char stream)
                   (#\/ (c-read-line stream))
@@ -273,13 +279,22 @@
                        (c-read-char stream))
                   (otherwise (read-error stream "Expected comment"))))
            (#\{ (read-delimited-list #\} stream t)) ;; initializer list
-           (#\[ (cons 'c-aref (read-delimited-list #\] stream t)))
+           (#\[ (list 'aref
+                      (parse-infix (loop with c do (setf c (next-char stream))
+                                      until (eql c #\]) collect (read-c-exp stream c)))))
            (#\- (if (eql (peek-char nil stream) #\-)
-                    (list '-- (read-c-exp stream (progn (c-read-char stream) (c-read-char stream))))
+                    (list '-- (progn (c-read-char stream) (next-exp stream)))
                     '-))
            (#\+ (if (eql (peek-char nil stream) #\+)
-                    (list '++ (read-c-exp stream (progn (c-read-char stream) (c-read-char stream))))
-                    '+))))))
+                    (list '++ (progn (c-read-char stream) (next-exp stream)))
+                    '+))
+           (#\~ (list 'lognot (next-exp stream)))
+           (#\! (if (eql (peek-char nil stream) #\=)
+                    (progn (c-read-char stream) '!=)
+                    (list 'not (next-exp stream))))
+           (#\= (if (eql (peek-char nil stream) #\=)
+                    (progn (c-read-char stream) '==)
+                    'setf))))))
 
 ;;; readtable
 
@@ -292,7 +307,7 @@
 
          (:macro-char #\" 'read-c-string nil)
 
-         (:macro-char #\# 'read-c-macro nil)
+;         (:macro-char #\# 'read-c-macro nil)
 
          ,@(loop for i from 0 upto 9 collect `(:macro-char ,(digit-char i) 'read-c-statement nil))
 
