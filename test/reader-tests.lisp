@@ -88,13 +88,13 @@ a + b;
   (foo 1))
 
 (reader-test function-call1
-  "printf(\"hello, world\n\");"
+  "printf(\"hello, world\\n\");"
   (printf "hello, world
 "))
 
 (reader-test lognot1
   "foo = ~010;"
-  (setf foo (lognot 8)))
+  (= foo (~ 8)))
 
 (reader-test nequal1
   "foo != 0x10;"
@@ -119,3 +119,23 @@ a + b;
 (reader-test dec3
   "--foo;"
   (-- foo))
+
+(reader-test op-precedence1
+  "a + b + c;"
+  (+ a (+ b c)))
+
+(reader-test assign1
+  "foo = 1;"
+  (= foo 1))
+
+(reader-test assign2
+  "foo = 1 + 2;"
+  (= foo (+ 1 2)))
+
+(reader-test assign3
+  "foo = !2;"
+  (= foo (! 2)))
+
+(reader-test assign4
+  "foo = ~2;"
+  (= foo (~ 2)))

@@ -11,4 +11,4 @@
    (:file "package")
    (:file "pointers")
    (:file "reader"))
-  :depends-on (:named-readtables))
+  :depends-on (:named-readtables :anaphora))

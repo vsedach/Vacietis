@@ -1,6 +1,10 @@
 (in-package #:vacietis.reader)
 (in-readtable vacietis)
 
+;;; this makes things a lot less hairy
+
+(defvar %in)
+
 ;;; error reporting
 
 (define-condition c-reader-error (reader-error simple-error)
@@ -176,43 +180,58 @@
 
 ;;; infix
 
-(defvar *binary-ops-table*
-  '((= += -= *= /= %= <<= >>= &= ^= |\|=|)
-    (elvis-if)
-    (|\|\||) ; or
-    (&&)     ; and
-    (|\||)   ; logior
-    (^)      ; logxor
-    (&)      ; logand
-    (== !=)
-    (< > <= >=)
-    (<< >>)  ; ash
-    (+ -)
-    (* / &)))
+(defparameter *assignment-ops* '(= += -= *= /= %= <<= >>= &= ^= |\|=|))
 
-(defun convert-assignment-op (aop lvalue rvalue)
-  `(setf ,lvalue (,(intern (reverse (subseq (reverse (symbol-name aop)) 1))) ,lvalue ,rvalue)))
+(defparameter *binary-ops-table*
+  '(|\|\|| ; or
+    &&     ; and
+    |\||   ; logior
+    ^      ; logxor
+    &      ; logand
+    == !=
+    < > <= >=
+    << >>  ; ash
+    + -
+    * / &))
 
-(defun parse-binary (args)
-  (list (second args) (first args) (third args)))
+;; leave this to implementation
+;; (defun convert-assignment-op (aop lvalue rvalue)
+;;   (if (eql '= aop)
+;;       `(setf ,lvaue ,rvalue)
+;;       `(setf ,lvalue (,(intern (reverse (subseq (reverse (symbol-name aop)) 1))) ,lvalue ,rvalue))))
+
+(defun parse-nary (args)
+  (flet ((split-recurse (x)
+           (list (elt args x) (parse-infix (subseq args 0 x)) (parse-infix (subseq args (1+ x))))))
+    (acond ((position-if (lambda (x) (member x *assignment-ops*)) args)
+            (split-recurse it))
+           ((position '? args)
+            (let ((?pos it))
+              (append (list 'if (parse-infix (subseq args 0 ?pos)))
+                      (aif (position '|:| (subseq args (1+ it)))
+                           (list (parse-infix (subseq args (1+ ?pos) it)) (parse-infix (subseq args (1+ it))))
+                           (read-error %in "Error parsing ?: trinary operator in: ~A" args)))))
+           ((loop for op in *binary-ops-table* thereis (position op args))
+            (split-recurse it))
+           (t (read-error %in "Error parsing expression: ~A" args)))))
 
 (defun parse-unary (a b)
-  (case a
-    (++ `(++ ,b))
-    (-- `(-- ,b))
-    (* `(deref* ,b))
-    (& `(addr& ,b))
-    (! `(lognot ,b))
-    (t (case b
-         (++ `(post++ ,a))
-         (-- `(post-- ,a))))))
+  (aif (find a '(++ -- ! ~))
+       (list it b)
+       (case a
+         (* `(deref* ,b))
+         (& `(addr& ,b))
+         (t (case b
+              (++ `(post++ ,a))
+              (-- `(post-- ,a))
+              (t  `(,a ,b))))))) ;; assume funcall for now
 
 (defun parse-infix (args)
   (if (listp args)
       (case (length args)
         (1 (parse-infix (car args)))
         (2 (parse-unary (parse-infix (first args)) (parse-infix (second args))))
-        (t (parse-binary args)))
+        (t (parse-nary args)))
       args))
 
 ;;; statements
@@ -268,7 +287,8 @@
           (read-variable stream token))))
 
 (defun read-c-statement (stream c)
-  (let ((next-token (read-c-exp stream c)))
+  (let ((next-token (read-c-exp stream c))
+        (%in stream))
     (cond ((c-type? next-token)
            (read-declaration stream next-token))
           ((control-flow-statement? next-token)
@@ -286,7 +306,7 @@
                                               (char-upcase #1#)))))
     (or (find-symbol identifier-name '#:vacietis.c) (intern identifier-name))))
 
-(defvar *ops*
+(defparameter *ops*
   '(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / ! ~ -> |.|))
 
 ;; this would be really simple if streams could unread more than one char
@@ -324,6 +344,7 @@
                ;;                                (setf previous-char c)))))
                ;;             (c-read-char stream))
                ;;        (otherwise (read-error stream "Expected comment"))))
+               (#\" (read-c-string stream c))
                (#\( (read-comma-separated-list stream #\())
                (#\{ (read-delimited-list #\} stream t)) ;; initializer list
                (#\[ (list 'aref

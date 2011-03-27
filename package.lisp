@@ -34,6 +34,8 @@
    #:>
    #:<=
    #:>=
+   #:!
+   #:~
 
    ;; keywords
    #:auto
@@ -75,4 +77,4 @@
    #:_Imaginary))
 
 (defpackage #:vacietis.reader
-  (:use #:cl #:named-readtables #:vacietis #:vacietis.c))
+  (:use #:cl #:named-readtables #:vacietis #:vacietis.c #:anaphora))
