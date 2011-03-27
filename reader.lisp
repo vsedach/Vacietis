@@ -211,7 +211,7 @@
            ((position '? args)
             (let ((?pos it))
               (append (list 'if (parse-infix (subseq args 0 ?pos)))
-                      (aif (position '|:| (subseq args (1+ it)))
+                      (aif (position '|:| args)
                            (list (parse-infix (subseq args (1+ ?pos) it)) (parse-infix (subseq args (1+ it))))
                            (read-error %in "Error parsing ?: trinary operator in: ~A" args)))))
            ((loop for op in *binary-ops-table* thereis (position op args))
@@ -227,7 +227,7 @@
          (t (case b
               (++ `(post++ ,a))
               (-- `(post-- ,a))
-              (t  `(,a ,b))))))) ;; assume funcall for now
+              (t  `(,a ,@(if (atom b) (list b) b)))))))) ;; assume funcall for now
 
 (defun parse-infix (args)
   (if (listp args)
@@ -246,9 +246,6 @@
                   until (eql c #\}) collect (read-c-statement c)))
       (read-error "Expected opening brace '{' but found '~A'" c)))
 
-(defun control-flow-statement? (identifier)
-  (member identifier '(if)))
-
 (defun c-type? (identifier)
   ;; and also do checks for struct, union, enum and typedef types
   (member identifier '(int static void const signed unsigned short long float double)))
@@ -263,7 +260,8 @@
               (let ((next-char (next-char)))
                 (if (eql next-char #\{)
                     (read-c-block next-char)
-                    (read-c-statement next-char)))))))
+                    (read-c-statement next-char)))))
+    (return (list 'return (read-c-statement (next-char))))))
 
 (defun read-comma-separated-list (open-delimiter)
   (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\}))))
@@ -282,21 +280,19 @@
   )
 
 (defun read-declaration (token)
-  (if (c-type? token)
-      (read-declaration (next-exp)) ;; throw away type info
+  (when (c-type? token)
+    (let ((name (next-exp))) ;; throw away type info
       (if (eql #\( (peek-char t %in))
-          (read-function token)
-          (read-variable token))))
+          (read-function name)
+          (read-variable name)))))
 
 (defun read-c-statement (c)
   (let ((next-token (read-c-exp c)))
-    (cond ((c-type? next-token)
-           (read-declaration next-token))
-          ((control-flow-statement? next-token)
-           (read-control-flow-statement next-token))
-          (t (parse-infix (cons next-token
-                                (loop with c do (setf c (next-char))
-                                      until (eql c #\;) collect (read-c-exp c))))))))
+    (or (read-declaration next-token)
+        (read-control-flow-statement next-token)
+        (parse-infix (cons next-token
+                           (loop with c do (setf c (next-char))
+                              until (eql c #\;) collect (read-c-exp c)))))))
 
 (defun read-c-identifier (c)
   (let ((identifier-name (concatenate 'string (string c) (slurp-while (lambda (c) (or (eql c #\_) (alphanumericp c)))))))

@@ -78,6 +78,22 @@ a + b;
   (defun foo (a b)
     (progn (+ a b))))
 
+(reader-test elvis0
+  "a ? 1 : 2;"
+  (if a 1 2))
+
+(reader-test elvis1
+  "a > b ? a : b;"
+  (if (> a b) a b))
+
+(reader-test elvis-return
+  "return a > b ? a : b;"
+  (return (if (> a b) a b)))
+
+(reader-test return1
+  "return 1;"
+  (return 1))
+
 ;; (reader-test function1
 ;;   "extern int max(int a, int b)
 ;; {
@@ -146,6 +162,10 @@ a + b;
   "foo(1);"
   (foo 1))
 
+(reader-test funcall-foo1
+  "foo(1,2);"
+  (foo 1 2))
+
 (reader-test function-call1
   "printf(\"hello, world\\n\");"
   (printf "hello, world
@@ -157,4 +177,10 @@ a + b;
 
 (reader-test function-call-assign0
   "result = general_alloc(bytes, page_type_flag);"
-  (= result (general_alloc bytes page_type_flat)))
+  (= result (general_alloc bytes page_type_flag)))
+
+(reader-test multi-line-exp0
+  "(SymbolValue(GC_PENDING,th) == NIL) &&
+   (SymbolValue(GC_INHIBIT,th) == NIL) &&
+   (random() < RAND_MAX/100);"
+  nil)
