@@ -295,12 +295,13 @@
                               until (eql c #\;) collect (read-c-exp c)))))))
 
 (defun read-c-identifier (c)
-  (let ((identifier-name (concatenate 'string (string c) (slurp-while (lambda (c) (or (eql c #\_) (alphanumericp c)))))))
-    (when (eq (readtable-case (find-readtable 'vacietis)) :invert) ;; otherwise it better be :preserve!
-      (dotimes (i (length identifier-name))
-        (setf #1=(aref identifier-name i) (if (upper-case-p #1#)
-                                              (char-downcase #1#)
-                                              (char-upcase #1#)))))
+  ;; assume inverted readtable (need to fix for case-preserving lisps)
+  (let* ((raw-name (concatenate 'string (string c) (slurp-while (lambda (c) (or (eql c #\_) (alphanumericp c))))))
+         (raw-name-alphas (remove-if-not #'alpha-char-p raw-name))
+         (identifier-name (format nil (cond ((every #'upper-case-p raw-name-alphas) "~(~A~)")
+                                            ((every #'lower-case-p raw-name-alphas) "~:@(~A~)")
+                                            (t "~A"))
+                                  raw-name)))
     (or (find-symbol identifier-name '#:vacietis.c) (intern identifier-name))))
 
 (defparameter *ops*

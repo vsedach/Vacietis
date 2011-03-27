@@ -184,3 +184,7 @@ a + b;
    (SymbolValue(GC_INHIBIT,th) == NIL) &&
    (random() < RAND_MAX/100);"
   nil)
+
+(reader-test funcall-compare
+  "SymbolValue(GC_PENDING,th) == NIL;"
+  (== (SymbolValue GC_PENDING th) NIL))
