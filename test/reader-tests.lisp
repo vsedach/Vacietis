@@ -158,11 +158,15 @@ a + b;
 
 ;;; function calls
 
-(reader-test function-call0
+(reader-test funcall-args0
+  "random();"
+  (random))
+
+(reader-test funcall-args1
   "foo(1);"
   (foo 1))
 
-(reader-test funcall-foo1
+(reader-test funcall-args2
   "foo(1,2);"
   (foo 1 2))
 
@@ -183,8 +187,23 @@ a + b;
   "(SymbolValue(GC_PENDING,th) == NIL) &&
    (SymbolValue(GC_INHIBIT,th) == NIL) &&
    (random() < RAND_MAX/100);"
-  nil)
+  (&& (== (SymbolValue GC_PENDING th) NIL)
+      (&& (== (SymbolValue GC_INHIBIT th) NIL)
+          (< (random) (/ RAND_MAX 100)))))
 
 (reader-test funcall-compare
   "SymbolValue(GC_PENDING,th) == NIL;"
   (== (SymbolValue GC_PENDING th) NIL))
+
+(reader-test funcall-compare-parethesized
+  "(SymbolValue(GC_PENDING,th) == NIL);"
+  (== (SymbolValue GC_PENDING th) NIL))
+
+(reader-test funcall-lessthan
+  "random() < RAND_MAX/100;"
+  (< (random) (/ RAND_MAX 100)))
+
+(reader-test multi-exp0
+  "(SymbolValue(GC_PENDING,th) == NIL) &&
+   (SymbolValue(GC_INHIBIT,th) == NIL);"
+  (&& (== (SymbolValue GC_PENDING th) NIL) (== (SymbolValue GC_INHIBIT th) NIL)))

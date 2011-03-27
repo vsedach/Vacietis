@@ -227,10 +227,10 @@
          (t (case b
               (++ `(post++ ,a))
               (-- `(post-- ,a))
-              (t  `(,a ,@(if (atom b) (list b) b)))))))) ;; assume funcall for now
+              (t  `(,a ,@(if (listp b) b (list b))))))))) ;; assume funcall for now
 
 (defun parse-infix (args)
-  (if (listp args)
+  (if (consp args)
       (case (length args)
         (1 (parse-infix (car args)))
         (2 (parse-unary (parse-infix (first args)) (parse-infix (second args))))
