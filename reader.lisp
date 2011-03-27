@@ -87,10 +87,13 @@
 
 (defun read-c-number (c)
   (prog1 (if (char= c #\0)
-             (case (peek-char nil %in)
-               ((#\X #\x) (c-read-char) (read-hex))
-               (#\. (read-float 0 #\.))
-               (otherwise (read-octal)))
+             (let ((next (peek-char nil %in)))
+               (if (digit-char-p next 8)
+                   (read-octal)
+                   (case next
+                     ((#\X #\x) (c-read-char) (read-hex))
+                     (#\.       (c-read-char) (read-float 0 #\.))
+                     (otherwise 0))))
              (read-decimal c))
     (loop repeat 2 do (when (find (peek-char nil %in nil nil) "ulf" :test #'eql)
                         (c-read-char)))))

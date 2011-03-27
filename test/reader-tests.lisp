@@ -11,6 +11,14 @@
   "12323.0;"
   12323.0)
 
+(reader-test zero
+  "0;"
+  0)
+
+(reader-test zero-float
+  "0.0;"
+  0.0)
+
 (reader-test string1
   "x = \"foo\";"
   (= x "foo"))
@@ -84,15 +92,6 @@ a + b;
 ;; }
 ;; ")
 
-(reader-test function-call0
-  "foo(1);"
-  (foo 1))
-
-(reader-test function-call1
-  "printf(\"hello, world\\n\");"
-  (printf "hello, world
-"))
-
 (reader-test lognot1
   "foo = ~010;"
   (= foo (~ 8)))
@@ -140,3 +139,22 @@ a + b;
 (reader-test assign4
   "foo = ~2;"
   (= foo (~ 2)))
+
+;;; function calls
+
+(reader-test function-call0
+  "foo(1);"
+  (foo 1))
+
+(reader-test function-call1
+  "printf(\"hello, world\\n\");"
+  (printf "hello, world
+"))
+
+(reader-test function-call2
+  "check_gc_signals_unblocked_or_lose(0);"
+  (check_gc_signals_unblocked_or_lose 0))
+
+(reader-test function-call-assign0
+  "result = general_alloc(bytes, page_type_flag);"
+  (= result (general_alloc bytes page_type_flat)))
