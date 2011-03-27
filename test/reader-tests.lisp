@@ -30,10 +30,6 @@ bar")
 ;;   "(int x, int y)"
 ;;   (int x int y))
 
-(reader-test decrement1
-  "--foo;"
-  (vacietis.c:-- foo))
-
 (reader-test identifier1
   "_foo;"
   _foo)
@@ -87,6 +83,10 @@ a + b;
 ;; }
 ;; ")
 
+(reader-test function-call0
+  "foo(1);"
+  (foo 1))
+
 (reader-test function-call1
   "printf(\"hello, world\n\");"
   (printf "hello, world
@@ -98,5 +98,24 @@ a + b;
 
 (reader-test nequal1
   "foo != 0x10;"
-  (vacietis.c:!= foo 16))
+  (!= foo 16))
 
+(reader-test inc1
+  "++a;"
+  (++ a))
+
+(reader-test inc2
+  "a++;"
+  (post++ a))
+
+(reader-test dec1
+  "--a;"
+  (-- a))
+
+(reader-test dec2
+  "a--;"
+  (post-- a))
+
+(reader-test dec3
+  "--foo;"
+  (-- foo))

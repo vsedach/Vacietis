@@ -16,10 +16,13 @@
 (in-readtable vacietis)
 
 (defpackage #:vacietis.c
+  (:use #:cl) ;; while developing
   (:export
    ;; operators
    #:--
    #:++
+   #:post--
+   #:post++
    #:==
    #:=
    #:!=

@@ -72,9 +72,9 @@
      (format nil "~d~a~a" prefix separator
              (slurp-while stream (lambda (c) (find c "0123456789+-eE" :test #'char=)))))))
 
-(defun read-decimal (stream)
+(defun read-decimal (stream c0) ;; c0 must be #\1 to #\9
   (labels ((digit-value (c) (- (char-code c) 48)))
-    (let ((value 0))
+    (let ((value (digit-value c0)))
       (loop-read stream
            (cond ((eq c 'end) (return value))
                  ((char<= #\0 c #\9) (setf value (+ (* 10 value) (digit-value c))))
@@ -85,9 +85,9 @@
   (prog1 (if (char= c #\0)
              (case (peek-char nil stream)
                ((#\X #\x) (c-read-char stream) (read-hex stream))
-               (#\. (c-unread-char c stream) (read-decimal stream))
+               (#\. (read-float 0 #\. stream))
                (otherwise (read-octal stream)))
-             (progn (c-unread-char c stream) (read-decimal stream)))
+             (read-decimal stream c))
     (loop repeat 2 do (when (find (peek-char nil stream nil nil) "ulf" :test #'eql)
                         (c-read-char stream)))))
 
@@ -176,17 +176,43 @@
 
 ;;; infix
 
-;; (defun find-highest-precedence-operator (args)
-;;   ((aref) (funcall) |.| -> ++ -- sizeof (lognot) (not) (address-of) (indirection) (cast) * / & + - << >> < > <= >= == != logand logxor logior logand logor elvis-if = += -= *= /= %= <<= >>= &= ^= )
-;;   (parse-infix before)
-;;   ()
-;;   (parse-infix after))
+(defvar *binary-ops-table*
+  '((= += -= *= /= %= <<= >>= &= ^= |\|=|)
+    (elvis-if)
+    (|\|\||) ; or
+    (&&)     ; and
+    (|\||)   ; logior
+    (^)      ; logxor
+    (&)      ; logand
+    (== !=)
+    (< > <= >=)
+    (<< >>)  ; ash
+    (+ -)
+    (* / &)))
+
+(defun convert-assignment-op (aop lvalue rvalue)
+  `(setf ,lvalue (,(intern (reverse (subseq (reverse (symbol-name aop)) 1))) ,lvalue ,rvalue)))
+
+(defun parse-binary (args)
+  (list (second args) (first args) (third args)))
+
+(defun parse-unary (a b)
+  (case a
+    (++ `(++ ,b))
+    (-- `(-- ,b))
+    (* `(deref* ,b))
+    (& `(addr& ,b))
+    (! `(lognot ,b))
+    (t (case b
+         (++ `(post++ ,a))
+         (-- `(post-- ,a))))))
 
 (defun parse-infix (args)
   (if (listp args)
-      (if (cdr args)
-          (list (second args) (first args) (third args))
-          (car args))
+      (case (length args)
+        (1 (parse-infix (car args)))
+        (2 (parse-unary (parse-infix (first args)) (parse-infix (second args))))
+        (t (parse-binary args)))
       args))
 
 ;;; statements
@@ -230,6 +256,7 @@
 
 (defun read-variable (stream name)
   ;; have to deal with array declarations like *foo_bar[baz]
+  (declare (ignore stream))
   `(defvar ,name)
   )
 
@@ -251,8 +278,7 @@
                                       until (eql c #\;) collect (read-c-exp stream c))))))))
 
 (defun read-c-identifier (stream c)
-  (unread-char c stream)
-  (let ((identifier-name (slurp-while stream (lambda (c) (or (eql c #\_) (alphanumericp c))))))
+  (let ((identifier-name (concatenate 'string (string c) (slurp-while stream (lambda (c) (or (eql c #\_) (alphanumericp c)))))))
     (when (eq (readtable-case (find-readtable 'vacietis)) :invert) ;; otherwise it better be :preserve!
       (dotimes (i (length identifier-name))
         (setf #1=(aref identifier-name i) (if (upper-case-p #1#)
@@ -260,41 +286,49 @@
                                               (char-upcase #1#)))))
     (or (find-symbol identifier-name '#:vacietis.c) (intern identifier-name))))
 
+(defvar *ops*
+  '(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / ! ~ -> |.|))
+
+;; this would be really simple if streams could unread more than one char
+;; also if CLISP didn't have bugs w/unread-char after peek and near EOF
+(defun match-longest-op (stream one)
+  (flet ((seq-matches (&rest chars)
+           (find (make-array (length chars) :element-type 'character :initial-contents chars)
+                 *ops* :test #'string= :key #'symbol-name)))
+    (let* ((two       (c-read-char stream))
+           (two-match (seq-matches one two)))
+      (if two-match
+          (let ((three-match (seq-matches one two (peek-char nil stream))))
+            (if three-match
+                (progn (c-read-char stream) three-match)
+                two-match))
+          (progn (c-unread-char two stream)
+                 (seq-matches one))))))
+
 (defun read-c-exp (stream c)
-  (cond ((digit-char-p c) (read-c-number stream c))
-        ((or (eql c #\_) (alpha-char-p c)) (read-c-identifier stream c))
-        (t
-         (case c
-           ;; (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
-           ;;        (read-c-macro stream)))
-           (#\/ (c-read-char stream) ;; comment
-                (case (c-read-char stream)
-                  (#\/ (c-read-line stream))
-                  (#\* (slurp-while stream
-                                    (let ((previous-char (code-char 0)))
-                                      (lambda (c)
-                                        (prog1 (not (and (char= previous-char #\*)
-                                                         (char= c #\/)))
-                                          (setf previous-char c)))))
-                       (c-read-char stream))
-                  (otherwise (read-error stream "Expected comment"))))
-           (#\{ (read-delimited-list #\} stream t)) ;; initializer list
-           (#\[ (list 'aref
-                      (parse-infix (loop with c do (setf c (next-char stream))
-                                      until (eql c #\]) collect (read-c-exp stream c)))))
-           (#\- (if (eql (peek-char nil stream) #\-)
-                    (list '-- (progn (c-read-char stream) (next-exp stream)))
-                    '-))
-           (#\+ (if (eql (peek-char nil stream) #\+)
-                    (list '++ (progn (c-read-char stream) (next-exp stream)))
-                    '+))
-           (#\~ (list 'lognot (next-exp stream)))
-           (#\! (if (eql (peek-char nil stream) #\=)
-                    (progn (c-read-char stream) '!=)
-                    (list 'not (next-exp stream))))
-           (#\= (if (eql (peek-char nil stream) #\=)
-                    (progn (c-read-char stream) '==)
-                    'setf))))))
+  (or (match-longest-op stream c)
+      (cond ((digit-char-p c) (read-c-number stream c))
+            ((or (eql c #\_) (alpha-char-p c)) (read-c-identifier stream c))
+            (t
+             (case c
+               ;; (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
+               ;;        (read-c-macro stream)))
+               ;; (#\/ (c-read-char stream) ;; comment
+               ;;      (case (c-read-char stream)
+               ;;        (#\/ (c-read-line stream))
+               ;;        (#\* (slurp-while stream
+               ;;                          (let ((previous-char (code-char 0)))
+               ;;                            (lambda (c)
+               ;;                              (prog1 (not (and (char= previous-char #\*)
+               ;;                                               (char= c #\/)))
+               ;;                                (setf previous-char c)))))
+               ;;             (c-read-char stream))
+               ;;        (otherwise (read-error stream "Expected comment"))))
+               (#\( (read-comma-separated-list stream #\())
+               (#\{ (read-delimited-list #\} stream t)) ;; initializer list
+               (#\[ (list 'aref
+                          (parse-infix (loop with c do (setf c (next-char stream))
+                                          until (eql c #\]) collect (read-c-exp stream c))))))))))
 
 ;;; readtable
 
@@ -303,14 +337,17 @@
        `(defreadtable c-readtable
          (:case :invert)
 
-         (:macro-char #\- 'read-c-statement nil) (:macro-char #\* 'read-c-statement nil)
+         ;; unary and prefix operators
+         ,@(loop for i in '(#\+ #\- #\~ #\! #\( #\& #\*) collect `(:macro-char ,i 'read-c-statement nil))
 
          (:macro-char #\" 'read-c-string nil)
 
 ;         (:macro-char #\# 'read-c-macro nil)
 
+         ;; numbers (should this be here?)
          ,@(loop for i from 0 upto 9 collect `(:macro-char ,(digit-char i) 'read-c-statement nil))
 
+         ;; identifiers
          (:macro-char #\_ 'read-c-statement nil)
          ,@(loop for i from (char-code #\a) upto (char-code #\z) collect `(:macro-char ,(code-char i) 'read-c-statement nil))
          ,@(loop for i from (char-code #\A) upto (char-code #\Z) collect `(:macro-char ,(code-char i) 'read-c-statement nil))
