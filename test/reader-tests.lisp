@@ -1,4 +1,5 @@
 (in-package #:vacietis.test)
+(in-readtable vacietis)
 
 (in-suite vacietis-reader)
 
@@ -11,20 +12,20 @@
   12323.0)
 
 (reader-test string1
-  "\"foo\""
-  "foo")
+  "x = \"foo\";"
+  (= x "foo"))
 
 (reader-test string2
-  "\"foo\" \"bar\""
-  "foobar")
+  "b = \"foo\" \"bar\";"
+  (= b "foobar"))
 
 ;; (reader-test unclosed-string
 ;;   "\"foo")
 
 (reader-test string-escape1
-  "\"foo\\nbar\""
-  "foo
-bar")
+  "_FOO = \"foo\\nbar\";"
+  (= _FOO "foo
+bar"))
 
 ;; (reader-test arglist1
 ;;   "(int x, int y)"
