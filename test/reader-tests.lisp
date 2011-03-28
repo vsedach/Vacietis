@@ -170,6 +170,14 @@ a + b;
   "foo(1,2);"
   (foo 1 2))
 
+(reader-test funcall-args3
+  "foo(1,2,3);"
+  (foo 1 2 3))
+
+(reader-test funcall-args4
+  "foo(1,2,3,4);"
+  (foo 1 2 3 4))
+
 (reader-test function-call1
   "printf(\"hello, world\\n\");"
   (printf "hello, world
@@ -207,3 +215,46 @@ a + b;
   "(SymbolValue(GC_PENDING,th) == NIL) &&
    (SymbolValue(GC_INHIBIT,th) == NIL);"
   (&& (== (SymbolValue GC_PENDING th) NIL) (== (SymbolValue GC_INHIBIT th) NIL)))
+
+(reader-test big-if
+  "if ((SymbolValue(GC_PENDING,th) == NIL) &&
+        (SymbolValue(GC_INHIBIT,th) == NIL) &&
+        (random() < RAND_MAX/100)) {
+        SetSymbolValue(GC_PENDING,T,th);
+        set_pseudo_atomic_interrupted(th);
+        maybe_save_gc_mask_and_block_deferrables(NULL);
+    }"
+  (if (&& (== (SymbolValue GC_PENDING th) NIL)
+          (&& (== (SymbolValue GC_INHIBIT th) NIL)
+              (< (random) (/ RAND_MAX 100))))
+      (progn
+        (SetSymbolValue GC_PENDING T th)
+        (set_pseudo_atomic_interrupted th)
+        (maybe_save_gc_mask_and_block_deferrables NULL))))
+
+(reader-test smaller-if
+  "if ((SymbolValue(GC_PENDING,th) == NIL) &&
+        (SymbolValue(GC_INHIBIT,th) == NIL) &&
+        (random() < RAND_MAX/100)) {
+1;
+    }"
+  (if (&& (== (SymbolValue GC_PENDING th) NIL)
+          (&& (== (SymbolValue GC_INHIBIT th) NIL)
+              (< (random) (/ RAND_MAX 100))))
+      (progn 1)))
+
+(reader-test cast1
+  "(int) foobar;"
+  foobar)
+
+(reader-test deref-var
+  "*foo;"
+  (deref* foo))
+
+(reader-test deref-funcall
+  "*foo();"
+  (deref* (foo)))
+
+(reader-test deref-assign-cast
+  "*access_control_stack_pointer(th) = (int) result;"
+  (= (deref* (access_control_stack_pointer th)) result))

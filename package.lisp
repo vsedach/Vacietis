@@ -39,6 +39,7 @@
    #:&
    #:&&
    #:^
+   #:deref*
 
    ;; keywords
    #:auto

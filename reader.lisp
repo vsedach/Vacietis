@@ -7,15 +7,17 @@
 
 ;;; error reporting
 
-(define-condition c-reader-error (reader-error simple-error)
-  ((line-number :reader line-number :initarg :line-number))
-  (:default-initargs :line-number *line-number*))
+(define-condition c-reader-error (reader-error) ;; SBCL hates simple-conditions?
+  ((line-number :reader line-number :initform *line-number*)
+   (msg         :reader msg         :initarg  :msg))
+  (:report (lambda (condition stream)
+             (write-string (msg condition) stream))))
 
 (defun read-error (msg &rest args)
   (error (make-condition 'c-reader-error
                          :stream %in
-                         :format-control (format nil "Error reading from C stream at line ~a: ~?"
-                                                 *line-number* msg args))))
+                         :msg (format nil "Error reading from C stream at line ~a: ~?"
+                                      *line-number* msg args))))
 
 ;;; basic stream stuff
 
@@ -183,6 +185,8 @@
 
 ;;; infix
 
+(defparameter *prefix-ops* '(++ -- ~ ! - + & *))
+
 (defparameter *assignment-ops* '(= += -= *= /= %= <<= >>= &= ^= |\|=|))
 
 (defparameter *binary-ops-table*
@@ -213,21 +217,27 @@
               (append (list 'if (parse-infix (subseq args 0 ?pos)))
                       (aif (position '|:| args)
                            (list (parse-infix (subseq args (1+ ?pos) it)) (parse-infix (subseq args (1+ it))))
-                           (read-error %in "Error parsing ?: trinary operator in: ~A" args)))))
-           ((loop for op in *binary-ops-table* thereis (position op args))
+                           (read-error "Error parsing ?: trinary operator in: ~A" args)))))
+           ((loop for op in *binary-ops-table* thereis (position op args :start 1))
             (split-recurse it))
-           (t (read-error %in "Error parsing expression: ~A" args)))))
+           ((find (first args) *prefix-ops*)
+            (if (= 3 (length args))
+                (parse-unary (first args) (parse-unary (second args) (third args)))
+                (read-error "Error parsing expression: ~A" args)))
+           (t args)))) ;; assume arglist
 
 (defun parse-unary (a b)
-  (aif (find a '(++ -- ! ~))
-       (list it b)
-       (case a
-         (* `(deref* ,b))
-         (& `(addr& ,b))
-         (t (case b
-              (++ `(post++ ,a))
-              (-- `(post-- ,a))
-              (t  `(,a ,@(if (listp b) b (list b))))))))) ;; assume funcall for now
+  (acond ((find a '(++ -- ! ~))
+          (list it b))
+         ((if (listp a) (some #'c-type? a) (c-type? a))
+          b) ;; looks like a cast, ignore it
+         (t (case a
+              (* `(deref* ,b))
+              (& `(addr& ,b))
+              (t (case b
+                   (++ `(post++ ,a))
+                   (-- `(post-- ,a))
+                   (t  `(,a ,@(if (listp b) b (list b)))))))))) ;; assume funcall for now
 
 (defun parse-infix (args)
   (if (consp args)
