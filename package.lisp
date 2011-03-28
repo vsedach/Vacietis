@@ -40,6 +40,7 @@
    #:&&
    #:^
    #:deref*
+   #:+=
 
    ;; keywords
    #:auto

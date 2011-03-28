@@ -258,3 +258,61 @@ a + b;
 (reader-test deref-assign-cast
   "*access_control_stack_pointer(th) = (int) result;"
   (= (deref* (access_control_stack_pointer th)) result))
+
+(reader-test plus-eql
+  "access_control_stack_pointer(th) += 1;"
+  (+= (access_control_stack_pointer th) 1))
+
+(reader-test pointer-pointer
+  "result = (int *) *access_control_stack_pointer(th);"
+  (= result (deref* (access_control_stack_pointer th))))
+
+(reader-test cast-deref
+  "(int) *foo();"
+  (deref* (foo)))
+
+(reader-test declare-pointer0
+  "int *result;"
+  (defvar result))
+
+(reader-test ptr-ptr-cast
+  "(int *)((char *)result + bytes);"
+  (+ result bytes))
+
+(reader-test ptr-ptr-cast-assign
+  "dynamic_space_free_pointer = (int *)((char *)result + bytes);"
+  (= dynamic_space_free_pointer (+ result bytes)))
+
+(reader-test cast-ptr-subtract
+  "(char *)dynamic_space_free_pointer
+                            - (char *)current_dynamic_space;"
+  (- dynamic_space_free_pointer current_dynamic_space))
+
+(reader-test funcall-arglist-op1
+  "foo(1 - 2);"
+  (foo (- 1 2)))
+
+(reader-test funcall-arglist-op2
+  "foo(1 - 2, 3 - 4);"
+  (foo (- 1 2) (- 3 4)))
+
+(reader-test funcall-arglist-op3
+  "foo(1 - 2, 4);"
+  (foo (- 1 2) 4))
+
+(reader-test funcall-cast-ptr-subtract
+  "set_auto_gc_trigger((char *)dynamic_space_free_pointer
+                            - (char *)current_dynamic_space);"
+  (set_auto_gc_trigger (- dynamic_space_free_pointer current_dynamic_space)))
+
+(reader-test big-if1
+  "if (current_auto_gc_trigger
+        && dynamic_space_free_pointer > current_auto_gc_trigger) {
+        clear_auto_gc_trigger();
+        set_auto_gc_trigger((char *)dynamic_space_free_pointer
+                            - (char *)current_dynamic_space);
+    }"
+  (if (&& current_auto_gc_trigger (> dynamic_space_free_pointer current_auto_gc_trigger))
+      (progn
+        (clear_auto_gc_trigger)
+        (set_auto_gc_trigger (- dynamic_space_free_pointer current_dynamic_space)))))

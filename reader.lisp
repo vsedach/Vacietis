@@ -179,7 +179,7 @@
 ;;         (c (next-char stream)))
 ;;     (read stream )))
 
-(defun cread-str (str) ;; for development
+(defun cstr (str) ;; for development
   (let ((*readtable* (find-readtable 'c-readtable)))
     (read-from-string str)))
 
@@ -210,7 +210,9 @@
 (defun parse-nary (args)
   (flet ((split-recurse (x)
            (list (elt args x) (parse-infix (subseq args 0 x)) (parse-infix (subseq args (1+ x))))))
-    (acond ((position-if (lambda (x) (member x *assignment-ops*)) args)
+    (acond ((and (consp (car args)) (consp (caar args)) (some #'c-type? (caar args)))
+            (parse-nary (cdr args))) ;; ignore casts
+           ((position-if (lambda (x) (member x *assignment-ops*)) args)
             (split-recurse it))
            ((position '? args)
             (let ((?pos it))
@@ -229,21 +231,21 @@
 (defun parse-unary (a b)
   (acond ((find a '(++ -- ! ~))
           (list it b))
-         ((if (listp a) (some #'c-type? a) (c-type? a))
-          b) ;; looks like a cast, ignore it
+         ((and (listp a) (listp (car a)) (some #'c-type? (car a)))
+          (parse-infix b)) ;; looks like a cast, ignore it
          (t (case a
               (* `(deref* ,b))
               (& `(addr& ,b))
               (t (case b
                    (++ `(post++ ,a))
                    (-- `(post-- ,a))
-                   (t  `(,a ,@(if (listp b) b (list b)))))))))) ;; assume funcall for now
+                   (t  `(,a ,@(mapcar #'parse-infix b))))))))) ;; assume funcall for now
 
 (defun parse-infix (args)
   (if (consp args)
       (case (length args)
         (1 (parse-infix (car args)))
-        (2 (parse-unary (parse-infix (first args)) (parse-infix (second args))))
+        (2 (parse-unary (first args) (second args)))
         (t (parse-nary args)))
       args))
 
@@ -258,7 +260,7 @@
 
 (defun c-type? (identifier)
   ;; and also do checks for struct, union, enum and typedef types
-  (member identifier '(int static void const signed unsigned short long float double)))
+  (member identifier '(int static void const signed unsigned short long float double char)))
 
 (defun next-exp ()
   (read-c-exp (next-char)))
@@ -274,14 +276,19 @@
     (return (list 'return (read-c-statement (next-char))))))
 
 (defun read-comma-separated-list (open-delimiter)
-  (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\}))))
-    (loop with c do (setf c (next-char))
-          until (eql c close-delimiter)
-          unless (eql #\, c) collect (read-c-exp c))))
+  (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\})))
+        (acc ()))
+    (flet ((gather-acc ()
+             (prog1 (reverse acc) (setf acc ()))))
+      (append (loop with c do (setf c (next-char))
+                    until (eql c close-delimiter)
+                    if (eql #\, c) collect (gather-acc)
+                    else do (push (read-c-exp c) acc))
+              (awhen (gather-acc) (list it))))))
 
 (defun read-function (name)
   `(defun ,name ,(remove-if #'c-type? ;; do the right thing with type declarations
-                            (read-comma-separated-list (next-char)))
+                            (reduce #'append (read-comma-separated-list (next-char))))
      ,(read-c-block (next-char))))
 
 (defun read-variable (name)
@@ -291,7 +298,8 @@
 
 (defun read-declaration (token)
   (when (c-type? token)
-    (let ((name (next-exp))) ;; throw away type info
+    (let ((name (loop with x do (setf x (next-exp))
+                      while (or (eql '* x) (c-type? x)) finally (return x)))) ;; throw away type info
       (if (eql #\( (peek-char t %in))
           (read-function name)
           (read-variable name)))))
