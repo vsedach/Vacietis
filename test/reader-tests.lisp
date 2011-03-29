@@ -1,7 +1,7 @@
-(in-package #:vacietis.test)
-(in-readtable vacietis)
+(cl:in-package #:vacietis.test.reader)
+(named-readtables:in-readtable vacietis:vacietis)
 
-(in-suite vacietis-reader)
+(eos:in-suite vacietis.test::vacietis-reader)
 
 (reader-test decimal
   "1234567890;"
@@ -61,7 +61,7 @@ bar"))
 
 (reader-test if-foo1
   "if foo { 1 + 2; }"
-  (if foo (progn (+ 1 2))))
+  (if foo (cl:tagbody (+ 1 2))))
 
 (reader-test if-foo2
   "if foo 1 + 2;"
@@ -69,14 +69,14 @@ bar"))
 
 (reader-test int-var1
   "int x;"
-  (defvar x))
+  (cl:defvar x))
 
 (reader-test simple-function1
   "void foo(int a, int b) {
 a + b;
 }"
-  (defun foo (a b)
-    (progn (+ a b))))
+  (cl:defun foo (a b)
+    (cl:tagbody (+ a b))))
 
 (reader-test elvis0
   "a ? 1 : 2;"
@@ -227,7 +227,7 @@ a + b;
   (if (&& (== (SymbolValue GC_PENDING th) NIL)
           (&& (== (SymbolValue GC_INHIBIT th) NIL)
               (< (random) (/ RAND_MAX 100))))
-      (progn
+      (cl:tagbody
         (SetSymbolValue GC_PENDING T th)
         (set_pseudo_atomic_interrupted th)
         (maybe_save_gc_mask_and_block_deferrables NULL))))
@@ -241,7 +241,7 @@ a + b;
   (if (&& (== (SymbolValue GC_PENDING th) NIL)
           (&& (== (SymbolValue GC_INHIBIT th) NIL)
               (< (random) (/ RAND_MAX 100))))
-      (progn 1)))
+      (cl:tagbody 1)))
 
 (reader-test cast1
   "(int) foobar;"
@@ -273,7 +273,7 @@ a + b;
 
 (reader-test declare-pointer0
   "int *result;"
-  (defvar result))
+  (cl:defvar result))
 
 (reader-test ptr-ptr-cast
   "(int *)((char *)result + bytes);"
@@ -313,6 +313,10 @@ a + b;
                             - (char *)current_dynamic_space);
     }"
   (if (&& current_auto_gc_trigger (> dynamic_space_free_pointer current_auto_gc_trigger))
-      (progn
+      (cl:tagbody
         (clear_auto_gc_trigger)
         (set_auto_gc_trigger (- dynamic_space_free_pointer current_dynamic_space)))))
+
+(reader-test deref-increment
+  "*x++;"
+  (deref* (post++ x)))

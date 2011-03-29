@@ -16,31 +16,46 @@
 (in-readtable vacietis)
 
 (defpackage #:vacietis.c
-  (:use #:cl) ;; while developing
   (:export
    ;; operators
-   #:--
-   #:++
-   #:post--
-   #:post++
-   #:==
    #:=
+   #:+=
+   #:-=
+   #:*=
+   #:/=
+   #:%=
+   #:<<=
+   #:>>=
+   #:&=
+   #:^=
+   #:|\|=|
+   #:?
+   #:|:|
+   #:|\|\||
+   #:&&
+   #:|\||
+   #:^
+   #:&
+   #:==
    #:!=
-   #:->
-   #:sizeof
-   #:<<
-   #:>>
    #:<
    #:>
    #:<=
    #:>=
+   #:<<
+   #:>>
+   #:++
+   #:--
+   #:+
+   #:-
+   #:*
+   #:/
    #:!
    #:~
-   #:&
-   #:&&
-   #:^
-   #:deref*
-   #:+=
+   #:->
+   #:|.|
+   #:?
+   #:|:|
 
    ;; keywords
    #:auto
@@ -79,7 +94,14 @@
    #:while
    #:_Bool
    #:_Complex
-   #:_Imaginary))
+   #:_Imaginary
+
+   ;; stuff we define
+   #:deref*
+   #:addr&
+   #:post--
+   #:post++
+   ))
 
 (defpackage #:vacietis.reader
-  (:use #:cl #:named-readtables #:vacietis #:vacietis.c #:anaphora))
+  (:use #:cl #:named-readtables #:vacietis #:anaphora))

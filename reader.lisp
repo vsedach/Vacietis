@@ -1,6 +1,35 @@
 (in-package #:vacietis.reader)
 (in-readtable vacietis)
 
+;;; set up lists of constants for reader to use (in separate package to avoid typing package prefix)
+
+(in-package #:vacietis.c)
+
+(cl:defparameter vacietis.reader::*ops*
+  '(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / ! ~ -> |.|))
+
+(cl:defparameter vacietis.reader::*prefix-ops* '(++ -- ~ ! - + & *))
+
+(cl:defparameter vacietis.reader::*unambiguous-prefix-ops* '(++ -- ! ~))
+
+(cl:defparameter vacietis.reader::*assignment-ops* '(= += -= *= /= %= <<= >>= &= ^= |\|=|))
+
+(cl:defparameter vacietis.reader::*binary-ops-table*
+  '(|\|\|| ; or
+    &&     ; and
+    |\||   ; logior
+    ^      ; logxor
+    &      ; logand
+    == !=
+    < > <= >=
+    << >>  ; ash
+    + -
+    * / &))
+
+(cl:defparameter vacietis.reader::*basic-c-types* '(int static void const signed unsigned short long float double char))
+
+(cl:in-package #:vacietis.reader)
+
 ;;; this makes things a lot less hairy
 
 (defvar %in)
@@ -134,10 +163,6 @@
                     (return string)))
            (vector-push-extend (read-char-literal c) string)))))
 
-;;; keywords
-
-(defvar *keywords* '("auto" "break" "case" "char" "const" "continue" "default" "do" "double" "else" "enum" "extern" "float" "for" "goto" "if" "inline" "int" "long" "register" "restrict" "return" "short" "signed" "sizeof" "static" "struct" "switch" "typedef" "union" "unsigned" "void" "volatile" "while" "_Bool" "_Complex" "_Imaginary"))
-
 ;;; preprocessor
 
 (defvar *in-preprocessor-p* nil)
@@ -185,21 +210,6 @@
 
 ;;; infix
 
-(defparameter *prefix-ops* '(++ -- ~ ! - + & *))
-
-(defparameter *assignment-ops* '(= += -= *= /= %= <<= >>= &= ^= |\|=|))
-
-(defparameter *binary-ops-table*
-  '(|\|\|| ; or
-    &&     ; and
-    |\||   ; logior
-    ^      ; logxor
-    &      ; logand
-    == !=
-    < > <= >=
-    << >>  ; ash
-    + -
-    * / &))
 
 ;; leave this to implementation
 ;; (defun convert-assignment-op (aop lvalue rvalue)
@@ -214,10 +224,10 @@
             (parse-nary (cdr args))) ;; ignore casts
            ((position-if (lambda (x) (member x *assignment-ops*)) args)
             (split-recurse it))
-           ((position '? args)
+           ((position 'vacietis.c:? args)
             (let ((?pos it))
-              (append (list 'if (parse-infix (subseq args 0 ?pos)))
-                      (aif (position '|:| args)
+              (append (list 'vacietis.c:if (parse-infix (subseq args 0 ?pos)))
+                      (aif (position 'vacietis.c:|:| args)
                            (list (parse-infix (subseq args (1+ ?pos) it)) (parse-infix (subseq args (1+ it))))
                            (read-error "Error parsing ?: trinary operator in: ~A" args)))))
            ((loop for op in *binary-ops-table* thereis (position op args :start 1))
@@ -229,16 +239,16 @@
            (t args)))) ;; assume arglist
 
 (defun parse-unary (a b)
-  (acond ((find a '(++ -- ! ~))
+  (acond ((find a *unambiguous-prefix-ops*)
           (list it b))
          ((and (listp a) (listp (car a)) (some #'c-type? (car a)))
           (parse-infix b)) ;; looks like a cast, ignore it
          (t (case a
-              (* `(deref* ,b))
-              (& `(addr& ,b))
+              (vacietis.c:* `(vacietis.c:deref* ,b))
+              (vacietis.c:& `(vacietis.c:addr& ,b))
               (t (case b
-                   (++ `(post++ ,a))
-                   (-- `(post-- ,a))
+                   (vacietis.c:++ `(vacietis.c:post++ ,a))
+                   (vacietis.c:-- `(vacietis.c:post-- ,a))
                    (t  `(,a ,@(mapcar #'parse-infix b))))))))) ;; assume funcall for now
 
 (defun parse-infix (args)
@@ -253,27 +263,29 @@
 
 (defun read-c-block (c)
   (if (eql c #\{)
-      (cons 'progn
+      (cons 'tagbody
             (loop with c do (setf c (next-char))
                   until (eql c #\}) collect (read-c-statement c)))
       (read-error "Expected opening brace '{' but found '~A'" c)))
 
 (defun c-type? (identifier)
   ;; and also do checks for struct, union, enum and typedef types
-  (member identifier '(int static void const signed unsigned short long float double char)))
+  (member identifier *basic-c-types*))
 
 (defun next-exp ()
   (read-c-exp (next-char)))
 
 (defun read-control-flow-statement (statement)
   (case statement
-    (if (list 'if
-              (parse-infix (next-exp))
-              (let ((next-char (next-char)))
-                (if (eql next-char #\{)
-                    (read-c-block next-char)
-                    (read-c-statement next-char)))))
-    (return (list 'return (read-c-statement (next-char))))))
+    (vacietis.c:if
+     (list 'vacietis.c:if
+           (parse-infix (next-exp))
+           (let ((next-char (next-char)))
+             (if (eql next-char #\{)
+                 (read-c-block next-char)
+                 (read-c-statement next-char)))))
+    (vacietis.c:return
+      (list 'vacietis.c:return (read-c-statement (next-char))))))
 
 (defun read-comma-separated-list (open-delimiter)
   (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\})))
@@ -299,7 +311,7 @@
 (defun read-declaration (token)
   (when (c-type? token)
     (let ((name (loop with x do (setf x (next-exp))
-                      while (or (eql '* x) (c-type? x)) finally (return x)))) ;; throw away type info
+                      while (or (eql 'vacietis.c::* x) (c-type? x)) finally (return x)))) ;; throw away type info
       (if (eql #\( (peek-char t %in))
           (read-function name)
           (read-variable name)))))
@@ -322,8 +334,7 @@
                                   raw-name)))
     (or (find-symbol identifier-name '#:vacietis.c) (intern identifier-name))))
 
-(defparameter *ops*
-  '(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / ! ~ -> |.|))
+
 
 ;; this would be really simple if streams could unread more than one char
 ;; also if CLISP didn't have bugs w/unread-char after peek and near EOF

@@ -19,3 +19,5 @@
           ',s-exp
           (let ((*readtable* (find-readtable 'c-readtable)))
             (read-from-string ,input))))))
+
+(import 'reader-test '#:vacietis.test.reader)
