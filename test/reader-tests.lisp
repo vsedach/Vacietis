@@ -320,3 +320,17 @@ a + b;
 (reader-test deref-increment
   "*x++;"
   (deref* (post++ x)))
+
+(reader-test no-arg-function
+  "void foo() {
+a + b;
+}"
+  (cl:defun foo ()
+    (cl:tagbody (+ a b))))
+
+(reader-test labeled-statement1
+  "void foo() {
+baz: a + b;
+}"
+  (cl:defun foo ()
+    (cl:tagbody baz (+ a b))))

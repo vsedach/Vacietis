@@ -1,6 +1,8 @@
 (in-package #:vacietis.reader)
 (in-readtable vacietis)
 
+(declaim (optimize (debug 3)))
+
 ;;; set up lists of constants for reader to use (in separate package to avoid typing package prefix)
 
 (in-package #:vacietis.c)
@@ -265,7 +267,7 @@
   (if (eql c #\{)
       (cons 'tagbody
             (loop with c do (setf c (next-char))
-                  until (eql c #\}) collect (read-c-statement c)))
+                  until (eql c #\}) append (reverse (multiple-value-list (read-c-statement c)))))
       (read-error "Expected opening brace '{' but found '~A'" c)))
 
 (defun c-type? (identifier)
@@ -316,13 +318,22 @@
           (read-function name)
           (read-variable name)))))
 
+(defun read-labeled-statement (token)
+  (when (eql #\: (peek-char t %in))
+    (next-char)
+    (values (read-c-statement (next-char)) token)))
+
 (defun read-c-statement (c)
   (let ((next-token (read-c-exp c)))
-    (or (read-declaration next-token)
-        (read-control-flow-statement next-token)
-        (parse-infix (cons next-token
-                           (loop with c do (setf c (next-char))
-                              until (eql c #\;) collect (read-c-exp c)))))))
+    ;; m-v-b is here because OR doesn't return multiple values except for last expression
+    (multiple-value-bind (statement label) (read-labeled-statement next-token)
+      (if statement
+          (values statement label)
+          (or (read-declaration next-token)
+              (read-control-flow-statement next-token)
+              (parse-infix (cons next-token
+                                 (loop with c do (setf c (next-char))
+                                    until (eql c #\;) collect (read-c-exp c)))))))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
