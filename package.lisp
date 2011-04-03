@@ -96,9 +96,12 @@
    #:_Complex
    #:_Imaginary
 
+   ;; stuff that should be in header files
+   #:NULL
+
    ;; stuff we define
    #:deref*
-   #:addr&
+   #:mkptr&
    #:post--
    #:post++
    ))

@@ -35,10 +35,6 @@
   (= _FOO "foo
 bar"))
 
-;; (reader-test arglist1
-;;   "(int x, int y)"
-;;   (int x int y))
-
 (reader-test identifier1
   "_foo;"
   _foo)
@@ -51,25 +47,11 @@ bar"))
   "bar_foo99;"
   bar_foo99)
 
-(reader-test number-plus
-  "1 + 2;"
-  (+ 1 2))
-
-(reader-test foo-plus
-  "foo + 2;"
-  (+ foo 2))
-
-(reader-test if-foo1
-  "if foo { 1 + 2; }"
-  (if foo (cl:tagbody (+ 1 2))))
-
-(reader-test if-foo2
-  "if foo 1 + 2;"
-  (if foo (+ 1 2)))
-
 (reader-test int-var1
   "int x;"
   (cl:defvar x))
+
+;;; function definition
 
 (reader-test simple-function1
   "void foo(int a, int b) {
@@ -77,6 +59,75 @@ a + b;
 }"
   (cl:defun foo (a b)
     (cl:tagbody (+ a b))))
+
+(reader-test function0
+  "int max(int a, int b)
+{
+return a > b ? a : b;
+}"
+  (cl:defun max (a b)
+    (cl:tagbody (return (if (> a b) a b)))))
+
+(reader-test function1
+  "extern int max(int a, int b)
+{
+return a > b ? a : b;
+}"
+  (cl:defun max (a b)
+    (cl:tagbody (return (if (> a b) a b)))))
+
+;; (reader-test function2 ;; yes this is legal
+;;   "extern int max(a, b)
+;; int a, b;
+;; {
+;; return a > b ? a : b;
+;; }
+;; ")
+
+;;; function calls
+
+(reader-test funcall-args0
+  "random();"
+  (random))
+
+(reader-test funcall-args1
+  "foo(1);"
+  (foo 1))
+
+(reader-test funcall-args2
+  "foo(1,2);"
+  (foo 1 2))
+
+(reader-test funcall-args3
+  "foo(1,2,3);"
+  (foo 1 2 3))
+
+(reader-test funcall-args4
+  "foo(1,2,3,4);"
+  (foo 1 2 3 4))
+
+(reader-test function-call1
+  "printf(\"hello, world\\n\");"
+  (printf "hello, world
+"))
+
+(reader-test function-call2
+  "check_gc_signals_unblocked_or_lose(0);"
+  (check_gc_signals_unblocked_or_lose 0))
+
+(reader-test function-call-assign0
+  "result = general_alloc(bytes, page_type_flag);"
+  (= result (general_alloc bytes page_type_flag)))
+
+;;; expressions
+
+(reader-test number-plus
+  "1 + 2;"
+  (+ 1 2))
+
+(reader-test foo-plus
+  "foo + 2;"
+  (+ foo 2))
 
 (reader-test elvis0
   "a ? 1 : 2;"
@@ -93,20 +144,6 @@ a + b;
 (reader-test return1
   "return 1;"
   (return 1))
-
-;; (reader-test function1
-;;   "extern int max(int a, int b)
-;; {
-;; return a > b ? a : b;
-;; }")
-
-;; (reader-test function2 ;; yes this is legal
-;;   "extern int max(a, b)
-;; int a, b;
-;; {
-;; return a > b ? a : b;
-;; }
-;; ")
 
 (reader-test lognot1
   "foo = ~010;"
@@ -156,41 +193,6 @@ a + b;
   "foo = ~2;"
   (= foo (~ 2)))
 
-;;; function calls
-
-(reader-test funcall-args0
-  "random();"
-  (random))
-
-(reader-test funcall-args1
-  "foo(1);"
-  (foo 1))
-
-(reader-test funcall-args2
-  "foo(1,2);"
-  (foo 1 2))
-
-(reader-test funcall-args3
-  "foo(1,2,3);"
-  (foo 1 2 3))
-
-(reader-test funcall-args4
-  "foo(1,2,3,4);"
-  (foo 1 2 3 4))
-
-(reader-test function-call1
-  "printf(\"hello, world\\n\");"
-  (printf "hello, world
-"))
-
-(reader-test function-call2
-  "check_gc_signals_unblocked_or_lose(0);"
-  (check_gc_signals_unblocked_or_lose 0))
-
-(reader-test function-call-assign0
-  "result = general_alloc(bytes, page_type_flag);"
-  (= result (general_alloc bytes page_type_flag)))
-
 (reader-test multi-line-exp0
   "(SymbolValue(GC_PENDING,th) == NIL) &&
    (SymbolValue(GC_INHIBIT,th) == NIL) &&
@@ -215,6 +217,16 @@ a + b;
   "(SymbolValue(GC_PENDING,th) == NIL) &&
    (SymbolValue(GC_INHIBIT,th) == NIL);"
   (&& (== (SymbolValue GC_PENDING th) NIL) (== (SymbolValue GC_INHIBIT th) NIL)))
+
+;;; conditionals
+
+(reader-test if-foo1
+  "if foo { 1 + 2; }"
+  (if foo (cl:tagbody (+ 1 2))))
+
+(reader-test if-foo2
+  "if foo 1 + 2;"
+  (if foo (+ 1 2)))
 
 (reader-test big-if
   "if ((SymbolValue(GC_PENDING,th) == NIL) &&
@@ -242,6 +254,8 @@ a + b;
           (&& (== (SymbolValue GC_INHIBIT th) NIL)
               (< (random) (/ RAND_MAX 100))))
       (cl:tagbody 1)))
+
+;;; casts and pointers
 
 (reader-test cast1
   "(int) foobar;"
@@ -334,3 +348,17 @@ baz: a + b;
 }"
   (cl:defun foo ()
     (cl:tagbody baz (+ a b))))
+
+(reader-test sizeof-something
+  "result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
+                      UNBOXED_PAGE_FLAG);"
+  (= result
+     (pa_alloc
+      (ALIGNED_SIZE
+       (* (+ 1 words) (sizeof lispobj)))
+      UNBOXED_PAGE_FLAG)))
+
+(reader-test deref-cast-shift
+  "*result = (int) (words << N_WIDETAG_BITS) | type;"
+  (= (deref* result)
+     (|\|| (<< words N_WIDETAG_BITS) type)))

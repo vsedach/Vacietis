@@ -28,7 +28,7 @@
     + -
     * / &))
 
-(cl:defparameter vacietis.reader::*basic-c-types* '(int static void const signed unsigned short long float double char))
+(cl:defparameter vacietis.reader::*basic-c-types* '(int static void const signed unsigned short long float double char extern))
 
 (cl:in-package #:vacietis.reader)
 
@@ -247,7 +247,7 @@
           (parse-infix b)) ;; looks like a cast, ignore it
          (t (case a
               (vacietis.c:* `(vacietis.c:deref* ,b))
-              (vacietis.c:& `(vacietis.c:addr& ,b))
+              (vacietis.c:& `(vacietis.c:mkptr& ,b))
               (t (case b
                    (vacietis.c:++ `(vacietis.c:post++ ,a))
                    (vacietis.c:-- `(vacietis.c:post-- ,a))
