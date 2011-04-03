@@ -10,29 +10,6 @@
   "An object identifying the file and line number on which the declaration or
    definition being processed began; or NIL if it was entered interactively.")
 
-; These communicate with cparse:LWhere() in zcparse.lisp.
-(defsubst zcenv>source-loc-file ()
-  (first *source-location*))
-
-(defsubst zcenv>source-loc-line ()
-  (second *source-location*))
-
-(defsubst zcenv>source-predefined-loc ()
-  '(:predefined 0))
-
-; In C, all identifiers used in a file must have been declared in that file
-; (or in files it includes).  As a convenience to the user, we relax this
-; restriction in most cases, but print a warning when we do so (see
-; ZCENV>GLOBAL-GET below).
-(defvar zcenv>*attempt-substitution* t
-  "If a declaration is not found in this file, do we attempt to find one in
-   another file?  (T by default)")
-
-; Under certain circumstances (e.g. when we're only looking for parameter types),
-; we don't want to print the warning.
-(defvar zcenv>*substitute-quietly* nil
-  "Don't warn when using a declaration from another file.  (NIL by default)")
-
 ; When the user is editing and incrementally compiling, it's possible for her to
 ; get her declarations into an inconsistent state -- for instance by deleting a
 ; declaration -- that will not be detected immediately.  So we call this whenever
@@ -400,127 +377,6 @@
   (let ((ident (zcenv>get name 'identifier env)))
     (and ident (eq (car ident) 'static-alternate-name) (cdr ident))))
 
-; For use by the lexer.  This is similar to the way the other kinds of bindings
-; work, but not identical: it keeps *all* #defines and #undefs in a file, so that
-; editor compilations have a chance of finding the right one.
-; Commented-out lines are part of a change I started (to keep the file and line
-; of the most recent definition), but which won't work now because of line number
-; bogosity (all lines in a section appear to start on the same line).  When that is
-; fixed, this can be.
-(defun zcenv>#define (sym defn *source-location*)
-  "#define a symbol."
-  (nlet ((file (zcenv>source-loc-file))
-	 ;; From the C listener, we always use line 0.
-	 ((line (if file (zcenv>source-loc-line) 0)))
-	 (defn-prop (get sym '/#define)))
-    ;; Back compatibility, both with very old version...
-    (when (and defn-prop (or (not (listp (car defn-prop)))
-			     (not (fixp (cadar defn-prop)))))
-      (format error-output "~&~S had an obsolete #DEFINE property" sym)
-      (setq defn-prop nil))
-;    ;; ... and with more recent.  (car defn-prop) is a list (<file> <line>) that
-;    ;; tells where the symbol was most recently #defined.
-;    (when (or (null defn-prop) (not (null (cddar defn-prop))))
-;     (setq defn-prop (cons (list nil 0) defn-prop)))
-    (setf (get sym '/#define) defn-prop)
-;    (do ((insert-point defn-prop (cdr insert-point)))
-    ;; We keep the definitions sorted first by package, then by file, then by line.
-    (do ((insert-point (locf (get sym '/#define)) (cdr insert-point)))
-	((or (null (cdr insert-point))
-	     (string-lessp (si:pkg-name (symbol-package file))
-			   (si:pkg-name (symbol-package
-					  (first (cadr insert-point)))))
-	     (string-lessp file (first (cadr insert-point)))
-	     (and (eq file (first (cadr insert-point)))
-		  (<= line (second (cadr insert-point)))))
-	 (if (and (cdr insert-point)
-		  (eq file (first (cadr insert-point)))
-		  (= line (second (cadr insert-point))))
-	     (setf (third (cadr insert-point)) defn)
-	   (rplacd insert-point (cons (list file line defn) (cdr insert-point))))
-	 `(zcenv>#define ',sym ',defn ',*source-location*)))))
-
-;; This is so complicated because we need to get the correct definition for the
-;; file and line we're on.
-(defun zcenv>#definition (sym *source-location*)
-  "Look up the #definition of a symbol."
-  (nlet ((alist (get sym '/#define))
-	 (file (zcenv>source-loc-file))
-	 ((line (if file (zcenv>source-loc-line) 0))))
-    (if (null file) (zcenv>#defn-menu sym file)
-      (if (null alist) nil
-	(do ((alist alist (cdr alist))
-	     (prevframe (car alist) (car alist)))
-	    ((or (null alist)
-		 (alphalessp (si:pkg-name (symbol-package file))
-			     (si:pkg-name (symbol-package (first (car alist)))))
-		 (alphalessp file (first (car alist)))
-		 (and (eq file (first (car alist)))
-		      (< line (second (car alist)))))
-	     (cond ((and (neq file (first prevframe))
-			 (neq file (first (car alist))))
-		    ;; No entry for this file at all.
-		    nil)
-		   ((or (neq file (first prevframe))
-			(and (null alist) (eq file (first prevframe))
-			     (< line (second prevframe))))
-		    ;; First entry for this file has higher line# than current.
-		    ;; Obviously this can only happen from the editor.
-		    (let ((frame (if (null alist) prevframe (car alist))))
-		      (and
-			(y-or-n-p
-			  (format nil "/"~A/", which had been first #defined on line ~D of ~A,~@
-				       is being referenced on line ~D; allow the reference? "
-				  sym (second frame) file line))
-			(third frame))))
-		   (t (third prevframe)))))))))
-
-(defvar zcenv>#defn-menu-item-list nil)
-
-(defresource zcenv>#defn-menu-menu ()
-  :constructor (tv:make-window 'tv:dynamic-pop-up-menu
-			       :item-list-pointer 'zcenv>#defn-menu-item-list))
-
-;; When we use a macro in the C listener, and the macro has more than one
-;; definition, there's no way to know which one the user means.  So we give her
-;; a menu.
-(defun zcenv>#defn-menu (sym file)
-  (nlet ((alist (get sym '/#define))
-	 ((alist (if (null file)        ; It is always null, as things stand.
-		     (subset #'(lambda (frame)
-				 (or (null (first frame))
-				     (eq package (symbol-package (first frame)))))
-			     alist)
-		   (subset #'(lambda (frame) (eq file (first frame)))
-			   alist)))
-	  ((alist (subset #'(lambda (frame) (third frame)) alist)))))
-    ;; If there are only one or no choices, don't bother after all.
-    (if (or (null alist)
-	    (gmap (:and) #'(lambda (frame)
-			     (equal (third frame) (third (car alist))))
-		  (:list (cdr alist))))
-	(and alist
-	     (or (null file)
-		 (eq (symbol-package file) (symbol-package (first (car alist)))))
-	     (third (car alist)))
-      (nlet ((menu (allocate-resource 'zcenv>#defn-menu-menu))
-	     (doc-string
-	       (format nil
-		       "Macro ~A has several possible expansions at this ~
-			point.  Choose one." sym))
-	     ((zcenv>#defn-menu-item-list
-		(mapcar #'(lambda (frame)
-			    `(,(cdr (third frame)) :value ,(third frame)
-			      :documentation ,doc-string)) alist))))
-	(unwind-protect
-	    (progn
-	      (send menu :set-label (format nil "Expansions of ~A" sym))
-	      (send menu :expose-near '(:mouse))
-	      (send menu :choose))
-	  (send menu :deactivate)
-	  (deallocate-resource 'zcenv>#defn-menu-menu menu))))))
-
-
 ; ================================================================
 ; Predicates on types.
 
@@ -558,7 +414,6 @@
 ;  (:UNION . frob)            A union.  <frob> is either the tag, if one was given
 ;                             when the union was declared, or the element alist,
 ;                             as for a struct (except the offsets are meaningless).
-
 
 (defsubst zctype>char-p (type)
   "Is this type the type of a character (unsigned)?"
@@ -717,8 +572,7 @@
 	      (eq (zctype>struct-tag type1) (zctype>struct-tag type2))))
 	(t nil)))
 
-;;; Written "inside" the type abstraction.  Change this if you change the structure of
-;;; a type representation!
+
 (defun zctype>equal (type1 type2)
   "Are these two precisely the same type, distinguishing even those cases that are
    implemented identically?  (I.e., this is a much tighter individuation than used
@@ -752,34 +606,6 @@
 ; ================================================================
 ; Type constructors.
 
-(defsubst zctype>char () ':char)
-
-(defsubst zctype>signed-char () ':signed-char)
-
-(defsubst zctype>short () ':short)
-
-(defsubst zctype>unsigned-short () ':unsigned-short)
-
-(defsubst zctype>int () ':int)
-
-(defsubst zctype>long () ':long)
-
-(defsubst zctype>unsigned () ':unsigned)
-
-(defsubst zctype>unsigned-long () ':unsigned-long)
-
-(defsubst zctype>float () ':float)
-
-(defsubst zctype>double () ':double)
-
-(defun zctype>lispval (&optional flavor)
-  (if flavor (list ':lispval flavor) ':lispval))
-
-(defsubst zctype>void () ':void)
-
-(defsubst zctype>boolean () ':boolean)
-
-(defsubst zctype>zero () ':zero)
 
 (defsubst zctype>null-pointer (type)
   "Makes a type /"null-pointer-to-TYPE/"."
@@ -1142,10 +968,6 @@
   (nlet ((size scale (zctype>sizeof-in-scale type env)))
     (* size (zctype>scale-size scale))))
 
-(defun zctype>element-count (&rest ignore)
-  "This function's old semantics no longer make sense."
-  (zcerror "Internal error: ZCTYPE>ELEMENT-COUNT called"))
-
 (defun zctype>struct-elt-offset (elt type env)
   "Given an element name ELT and a struct type TYPE, computes the offset in the
    structure at which ELT is to be found, or NIL if ELT is not found.  This
@@ -1182,14 +1004,6 @@
 ; ================================================================
 ; Variable declaration processing.
 
-(defun zcdecl>external-declaration (decl)
-  "Processes an external declaration, returning three values; 1: a result-list;
-   2: a list of top-level putprop forms to accomplish the type declarations; and
-   3: the storage class.  If the storage-class is NIL or ':STATIC, the result-list
-   is a list of (variable initializer) pairs; if ':EXTERN, it's a list of variables
-   to be declared special; otherwise, it should be ignored."
-  (zcdecl>process-one-decl decl (zcenv>global-env) ':external))
-
 (defun zcdecl>local-declarations (decls env)
   "Processes a list of local declarations, adding them to the environment ENV,
    and returns four values: a list of initialization clauses for locals; a list
@@ -1217,6 +1031,7 @@
 			(caar autos))))
 	 auto-inits)
     (values auto-inits specials static-inits toplevel-forms)))
+
 (defun zcdecl>local-declarations-1 (decls env auto-inits specials static-inits
 				    toplevel-forms)
   (if (null decls)
@@ -1290,10 +1105,6 @@
 	#'(lambda (decl)
 	    (zcdecl>process-one-decl decl env ':struct-element))
 	(:list decls)))
-
-; Some kind of not-quite-syntactic error in a declaration.
-(define-condition declaration-error (message) (error)
-  (:initable-instance-variables))
 
 (defun zcdecl>parser-declaration (decl env)
   "Processes a parameter or local declaration for the parser.  This is in case the
@@ -1416,26 +1227,6 @@
 	     (and (zctype>canonicalized-pointer-p type)
 		  (nlet ((array-sym index-sym (zcprim>pointer-var-pair var)))
 		    (list array-sym index-sym))))))
-
-(defconst zcdecl>*storage-class-specifiers*
-	  '((c:|extern| . :extern) (c:|static| . :static)
-	    (c:|register| . :register) (c:|auto| . :auto)
-	    (c:|restarg| . :restarg) (c:|optarg| . :optarg)
-	    (c:|typedef| . :typedef)))
-
-(defconst zcdecl>*primitive-types*
-	  '((c:|char| . :char) (c:|int| . :int)
-	    (c:|float| . :float) (c:|double| . :double)
-	    (c:|lispval| . :lispval) (c:|void| . :void)
-	    (nil . :void))
-  "The primitive type /"nouns/", and their corresponding internal types.")
-
-(defconst zcdecl>*type-adjectives*
-	  '((c:|short| . (:short nil))
-	    (c:|long| . (:long nil))
-	    (c:|signed| . (nil :signed))
-	    (c:|unsigned| . (nil :unsigned)))
-  "The primitive type adjectives.")
 
 (defun zcdecl>decl-typelist (typelist context env)
   "Returns values: 1: type; 2: context; 3: storage class to be remembered, if any;
@@ -1865,27 +1656,13 @@
 	(set address-sym
 	     (zcdecl>scalar-address-var name type (zcenv>global-env)))))))
 
-;; Called at runtime by forms generated by the above.
-(defun zcdecl>scalar-address-var (name type env)
-  ;; TARRAY may have had something to do with strangeness of byte arrays on the
-  ;; 3600.  Can't, at this juncture, remember what though.
-  (nlet (; ?? WHY is this here??? (tarray (make-array 1))
-	 (value-loc (value-cell-location name))
-	 ((aarray (make-array 1 :type (zcprim>scale-art (zctype>type-scale type))
-			      :displaced-to value-loc ; ?? was: tarray
-			      :named-structure-symbol 'value-cell
-			      :leader-list (zcprim>array-leader-init
-					     name (zctype>array-of type 1) env)))))
-    ;;(%p-store-tag-and-pointer (aloc tarray 0) dtp-one-q-forward value-loc)
-    (zcprim>store-scale-slot (zctype>type-scale type) aarray aarray)
-    aarray))
-
 (defun zcdecl>create-or-reuse-structure (old-val type env &optional ignore)
   "Creates a structure suitable for TYPE, reusing pieces of OLD-VAL when possible."
   (let ((new-val (zcdecl>create-or-reuse-structure-1 old-val type env)))
     (when (and (neq old-val new-val) (arrayp old-val) (arrayp new-val))
       (structure-forward old-val new-val))
     new-val))
+
 (defun zcdecl>create-or-reuse-structure-1 (old-val type env)
   (cond
     ((or (zctype>lispval-p type) (zctype>void-p type)) nil)
@@ -2210,21 +1987,6 @@
       (zcprim>coerce-numbers
 	(zcprim>canonicalize-if-needed trans-exp type req-type)
 	type req-type))))
-
-; Omitted from the Symbolics system.
-#+Symbolics
-(defun array-initialize (a val &optional (start 0) (end (array-length a)))
-  (and (> end start)
-       (if (eq (array-type a) 'art-q)
-	   (si:%block-store-cdr-and-contents (aloc a start) (- end start)
-					     cdr-next val 0)
-	 ;; This could be done faster, but it's not the common case anyhow.
-	 (let ((a a))
-	   (declare (sys:array-register a))
-	   (do ((i start (1+ i)))
-	       ((>= i end) a)
-	     (aset val a i))))))
-
 
 
 ; ================================================================

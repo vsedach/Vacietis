@@ -22,81 +22,6 @@
      (caller callee expected-return-type . arg-types-passed)
    telling how the function has been called from this function.")
 
-(defprim c:+
-  "Arithmetic addition.  Also, one arg may be a pointer.  Or, the second arg may be
-   omitted (the ANSI spec defines unary + to constrain the order of evaluation of
-   arithmetic expressions; we don't rearrange expressions anyway, so just ignore
-   it)."
-  (((arg1 type1 :unary))
-   (values arg1 (zcprim>unary-arith-result "+ (unary)" type1)))
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (cond ((and (zctype>number-p type1) (zctype>number-p type2))
-	  (values (zcprim>+ arg1 arg2)
-		  (zcprim>binary-arith-result "+" type1 type2)))
-	 ((and (zctype>arith-pointer-p type1) (zctype>integer-p type2))
-	  (zcprim>pointer-plus-int arg1 arg2 type1 #'zcprim>+ **env))
-	 ((and (zctype>integer-p type1) (zctype>arith-pointer-p type2))
-	  (zcprim>pointer-plus-int arg2 arg1 type2 #'zcprim>+ **env))
-	 (t (zcerror "Wrong argument type to +: ~A or ~A" type1 type2)))))
-
-(defprim c:-
-  "Arithmetic subtraction.  The first arg may be a pointer.  Alternatively, both
-   args may be pointers, but they must point into the same array (this constraint
-   is enforced at runtime).  Or, the second arg may be omitted, for unary
-   negation."
-  (((arg1 type1 :unary))
-   (values (zcprim>- arg1) (zcprim>unary-arith-result "- (unary)" type1)))
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (cond ((and (zctype>number-p type1) (zctype>number-p type2))
-	  (values (zcprim>- arg1 arg2)
-		  (zcprim>binary-arith-result "- (binary)" type1 type2)))
-	 ((and (zctype>arith-pointer-p type1) (zctype>integer-p type2))
-	  (zcprim>pointer-plus-int arg1 arg2 type1 #'zcprim>- **env))
-	 ((and (zctype>arith-pointer-p type1) (zctype>arith-pointer-p type2))
-	  (zcprim>pointer-subtract arg1 type1 arg2 type2 **env))
-	 (t (zcerror "Wrong argument type to -: ~A or ~A" type1 type2)))))
-
-(defun zcprim>pointer-plus-int (arg1 arg2 type1 operation env)
-  "Handles addition and subtraction of a pointer and an integer.  OPERATION should
-   be #'ZCPRIM>+ or #'ZCPRIM>-."
-  (multiple-value-bind (let-clauses ptr-array ptr-index)
-      (analyze-pointer-exp arg1 type1)
-    (values (zcprim>let-form let-clauses
-	      `(zcptr>cons ,ptr-array
-			   ,(funcall operation ptr-index
-				     (zcprim>scale-ptr-offset arg2 type1 env))))
-	    (zctype>canonicalize-pointer type1))))
-
-(defun zcprim>pointer-subtract (arg1 type1 arg2 type2 env)
-  "Handles the subtraction of two pointers."
-  (multiple-value-bind (let-clauses-1 array-1 index-1)
-      (analyze-pointer-exp arg1 type1)
-    (multiple-value-bind (let-clauses-2 array-2 index-2)
-        (analyze-pointer-exp arg2 type2)
-      (if (not (and (zctype>arith-pointer-p type1) (zctype>arith-pointer-p type2)
-                    (zctype>match type1 type2 env)))
-          (zcerror "Wrong argument type in pointer subtraction: ~A or ~A"
-                   type1 type2)
-          (values (zcprim>let-form (append let-clauses-1 let-clauses-2)
-                                   `(if (zcptr>subtract-check ,array-1 ,array-2)
-                                        ,(zcprim>unscale-ptr-difference (zcprim>- index-1 index-2)
-                                                                        type1 env)))
-                  (zctype>int))))))
-
-(defprim c:*
-  "Arithmetic multiplication.  Or, with one argument, pointer dereferencing."
-  (((arg1 type1 :unary))
-   (cond ((not (zctype>pointer-p type1))
-	  (zcerror "Wrong argument type to * (pointer dereference): ~A" type1))
-	 ; Special case for pointer-to-function deref.
-	 ((zctype>function-pointer-p type1)
-	  (values arg1 (zctype>pointer-deref-type type1)))
-	 (t
-	  (deref-pointer arg1 type1 **env))))
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (values (zcprim>* arg1 arg2)
-	   (zcprim>binary-arith-result "* (multiply)" type1 type2))))
-
 (defun deref-pointer (ptr type env &optional unpacked-struct-reference)
   "Creates an expression to dereference a pointer expression PTR, of type TYPE.
    Returns that as its first value, and the type of that as its second."
@@ -133,18 +58,6 @@
       (zcerror "Internal error: Flavor of AREF, ~A, not accounted for!?"
 	       aref-sym)))
 
-(defprim c://
-  "Arithmetic division.  Negative results of integer division truncate toward 0."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (values (zcprim>// arg1 arg2)
-	   (zcprim>binary-arith-result "//" type1 type2))))
-
-(defprim c:%
-  "Arithmetic remainder.  Result has same sign as the dividend."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (values (zcprim>\ arg1 arg2)
-	   (zcprim>binary-int-arith-result "%" type1 type2))))
-
 (defprim c:<<
   "Logical left shift."
   (((arg1 type1 :unary) (arg2 type2 :unary))
@@ -160,45 +73,6 @@
 	   (if (not (and (zctype>integer-p type1) (zctype>integer-p type2)))
 	       (zcerror "Wrong argument type to <<: ~A or ~A" type1 type2)
 	     type1))))
-
-(defprim c:&
-  "Unary: pointer creation (address-of); binary: bitwise AND."
-  (((arg type))
-   (zcprim>pointer-to arg type **env **form))
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (values (or (zcprim>&-ldb-optimization arg1 arg2)
-	       (zcprim>&-ldb-optimization arg2 arg1)
-	       (zcprim>logand arg1 arg2))
-	   (zcprim>binary-int-arith-result "& (bitwise AND)" type1 type2))))
-
-(defun zcprim>pointer-to (exp type env form)
-  "Makes a pointer to expression EXP, of type TYPE."
-  (bcond ((zctype>array-p type)
-	  (zcwarn "Redundant & operator applied to array ~A" exp)
-	  (values (zcprim>canonicalize-if-needed exp type)
-		  (zctype>canonicalize-pointer type)))
-	 ((and (zctype>function-pointer-p type) (listp exp)
-	       (eq (car exp) 'zcprim>function))
-	  (zcwarn "Redundant & operator applied to function name ~A" (cadr exp))
-	  (values exp type))
-	 ((zctype>struct-p type)
-	  ;; Special case for structures in flat mode.
-	  (values (zcprim>canonicalize-if-needed exp
-						 (zctype>array-of (zctype>int)))
-		  (zctype>pointer-to type)))
-	 (((let-clauses array index arefs-p
-	    (and (zcprim>lvalue-ok-check exp type (cadr form))
-		 (zcprim>analyze-aref-exp exp type)))
-	   arefs-p)			     ; special case for &foo[i], &*foo
-	  (values (zcprim>let-form let-clauses `(zcptr>cons ,array ,index))
-		  (zctype>pointer-to type)))
-	 ((symbolp exp)
-	  (values `(zcptr>cons ,(zcprim>variable-address exp env) 0)
-		  (zctype>pointer-to type)))
-	 ((and (listp exp) (memq (car exp) '(ldb ldb-signed)))
-	  (zcerror "Cannot make a pointer to a bit field"))
-	 (t (zcerror "Internal error: don't know how to make a pointer to ~A"
-		     exp))))
 
 (defun zcprim>variable-address (sym env)
   (let ((depth (nth-value 1 (var-type sym env))))
@@ -223,57 +97,8 @@
 		    (t `(ldb (byte ,(haulong arg1) ,(cadr ash-arg2))
 			     ,(cadr arg2))))))))
 
-(defprim c:\|
-  "Bitwise OR."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (values (zcprim>logior arg1 arg2)
-	   (zcprim>binary-int-arith-result "\| (bitwise OR)" type1 type2))))
-
-(defprim c:^
-  "Bitwise XOR."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (values (zcprim>logxor arg1 arg2)
-	   (zcprim>binary-int-arith-result "^ (bitwise XOR)" type1 type2))))
-
-(defprim c:~
-  "Bitwise NOT, a.k.a. ones complement."
-  (((arg1 type1 :unary))
-   (values (zcprim>lognot arg1)
-	   (zcprim>unary-int-arith-result "~ (bitwise NOT)" type1))))
-
-
 ; ================================================================
 ; Comparison and logical operators.
-
-(defprim c:==
-  "Equality comparison."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (zcprim>compare arg1 type1 arg2 type2 **env 'eql t "==")))
-
-(defprim c:!=
-  "Inequality comparison."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (zcprim>compare arg1 type1 arg2 type2 **env 'eql nil "!=")))
-
-(defprim c:<
-  "Less-than comparison."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (zcprim>compare arg1 type1 arg2 type2 **env '< t "<")))
-
-(defprim c:>
-  "Greater-than comparison."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (zcprim>compare arg2 type2 arg1 type1 **env '< t ">")))
-
-(defprim c:<=
-  "Less-than-or-equal-to comparison."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (zcprim>compare arg2 type2 arg1 type1 **env '< nil "<=")))
-
-(defprim c:>=
-  "Greater-than-or-equal-to comparison."
-  (((arg1 type1 :binary) (arg2 type2 :binary))
-   (zcprim>compare arg1 type1 arg2 type2 **env '< nil ">=")))
 
 (defun zcprim>compare (arg1 type1 arg2 type2 env pred polarity pred-name)
   (when (not (memq pred '(eql <)))
@@ -337,35 +162,6 @@
   (cond (polarity exp)
 	((memq exp '(T NIL)) (not exp))
 	(t `(not ,exp))))
-
-; These three can't get type errors!  Types checked in zcprim>standard-coercions.
-(defprim c:!
-  "Logical NOT."
-  (((arg type :boolean))
-   (values (if (memq arg '(T NIL)) (not arg) `(not ,arg))
-	   type)))		   ; might be lispval
-
-(defprim c:&&
-  "Logical AND.  As you would expect, this only evaluates as many arguments
-   as it needs to for a result (/"short-circuiting/")."
-  ((&rest (args types :boolean))
-   (values (if (every args #'(lambda (arg) (memq arg '(T NIL))))
-	       (gmap (:and) :id (:list args))
-	     `(and . ,args))
-	   (if (gmap (:and) #'zctype>lispval-p (:list types)) (zctype>lispval)
-	     (zctype>boolean)))))
-
-(defprim c:/|/|
-  "Logical OR.  As you would expect, this only evaluates as many arguments
-   as it needs to for a result (/"short-circuiting/")."
-  ((&rest (args types :boolean))
-   (ignore types)
-   (values (if (every args #'(lambda (arg) (memq arg '(T NIL))))
-	       (gmap (:or) :id (:list args))
-	     `(or . ,args))
-	   (if (gmap (:and) #'zctype>lispval-p (:list types)) (zctype>lispval)
-	     (zctype>boolean)))))
-
 
 ; ================================================================
 ; Assignment and modify-in-place operators.  C has a gaggle of these.
@@ -931,8 +727,6 @@
 	 (size (cadr bytespec)))
     `(nlet ((,temp (ldb ,bytespec ,word)))
        (dpb ,temp (byte ,(1- size) 0) (- (ldb (byte 1 ,(1- size)) ,temp))))))
-#+Symbolics (putprop 'ldb-signed (get 'ldb 'lt::setf-method) 'lt::setf-method)
-#-Symbolics (putprop 'ldb-signed (get 'ldb 'si:setf-method) 'si:setf-method)
 
 (defun zcprim>coerce-struct-pointer (ptr elt-type unpacked)
   "Given a pointer to some kind of struct, coerces it to point to ELT-TYPE."
@@ -944,38 +738,6 @@
 	      `(zcptr>cons (zcprim>art-16b-slot ,array) ,(zcprim>* index 2))))
       (:8B (zcprim>let-form let-clauses
 	     `(zcptr>cons (zcprim>art-8b-slot ,array) ,(zcprim>* index 4)))))))
-
-(defun zcprim>array-leader-init (name type env)
-  `((,name ,type ,env) nil nil nil nil nil #+Chars nil))
-
-(defun zcprim>cast-array-leader-init (parent)
-  `(,parent nil nil nil nil nil #+Chars nil))
-
-(defsubst zcprim>array-leader-length ()
-  #-Chars 6 #+Chars 7)
-
-(defsubst zcprim>array-desc (frob)
-  (array-leader frob 0))
-
-;;; In general, use NAMED-STRUCTURE-P instead.
-(defsubst zcprim>array-named-structure-symbol (frob)
-  (array-leader frob 1))
-
-(defsubst zcprim>array-freelist-link (frob)
-  (array-leader frob 2))
-
-(defsubst zcprim>art-q-slot (frob)
-  (array-leader frob 3))
-
-(defsubst zcprim>art-16b-slot (frob)
-  (array-leader frob 4))
-
-(defsubst zcprim>art-8b-slot (frob)
-  (array-leader frob 5))
-
-#+Chars
-(defsubst zcprim>art-string-slot (frob)
-  (array-leader frob 6))
 
 (defun zcprim>array-consed-type (frob)
   "Returns the type with which FROB was originally consed."
@@ -1080,86 +842,6 @@
 		  (let ((8b (zcprim>art-8b-slot frob)))
 		    (if (and 8b (not (array-displaced-p 8b))) 8b
 		      (zcprim>art-16b-slot frob)))))))
-
-(defun zcprim>array-as-q (frob)
-  #+3600
-  "Returns an ART-Q array displaced onto FROB, using the cached one or creating and
-   caching a new one as appropriate."
-  #-3600
-  "Returns the ART-Q part of FROB, using the cached one or creating and caching a
-   new one as appropriate.  Note that the ART-Q part does not share storage with
-   the ART-16B and ART-8B parts."
-  (if (null frob) nil			     ; For null pointer.
-    (zcprim>check-array-leader frob)
-    (or (zcprim>art-q-slot frob)
-	(nlet ((elts//word (// 4 (zctype>scale-size (zcprim>array-scale frob))))
-	       (length (array-length frob))
-	       (actual (zcprim>array-boxed-actual frob))
-	       ((q-frob (make-array
-			  (ceiling length elts//word)
-			  #+3600 :displaced-to #+3600 actual
-			  :named-structure-symbol 'cast-array
-			  :leader-list (zcprim>cast-array-leader-init
-					 (zcprim>array-primary frob))))))
-	  (setf (zcprim>art-q-slot frob) q-frob)
-	  ;; The following allows us to access the last word in the Q version, even
-	  ;; though not all of that word is contained in the byte array.
-	  #+3600
-	  (progn ;; "(max 1 ...)" keeps ALOC from erroring on 0-length frob.
-		 (adjust-array-size frob (upto-next (max 1 length) elts//word))
-		 (setf (si:array-indirect-pointer q-frob) (aloc q-frob 0))
-		 (adjust-array-size frob length))
-	  (zcprim>link-slot-web frob)
-	  q-frob))))
-
-(defun zcprim>array-as-16b (frob)
-  #+3600
-  "Returns an ART-16B array displaced onto FROB, using the cached one or creating
-   and caching a new one as appropriate."
-  #-3600
-  "Returns an ART-16B array displaced onto the unboxed part of FROB, using the
-   cached one or creating and caching a new one as appropriate."
-  (if (null frob) nil			     ; For null pointer.
-    (zcprim>check-array-leader frob)
-    (or (zcprim>art-16b-slot frob)
-	(nlet ((elts//word (// 4 (zctype>scale-size (zcprim>array-scale frob))))
-	       (length (array-length frob))
-	       (actual (zcprim>array-unboxed-actual frob))
-	       ((16b-frob (make-array
-			    (ceiling (* length 2) elts//word)
-			    :type art-16b :named-structure-symbol 'cast-array
-			    :displaced-to actual
-			    :leader-list (zcprim>cast-array-leader-init
-					   (zcprim>array-primary frob))))))
-	  (setf (zcprim>art-16b-slot frob) 16b-frob)
-	  (zcprim>link-slot-web frob)
-	  16b-frob))))
-
-(defun zcprim>array-as-8b (frob)
-  #+3600
-  "Returns an ART-8B array displaced onto FROB, using the cached one or creating
-   and caching a new one as appropriate."
-  #-3600
-  "Returns an ART-16B array displaced onto the unboxed part of FROB, using the
-   cached one or creating and caching a new one as appropriate."
-  (if (null frob) nil			     ; For null pointer.
-    (zcprim>check-array-leader frob)
-    (or (zcprim>art-8b-slot frob)
-	(let ((8b-frob (zcprim>array-as-bytes frob art-8b)))
-	  (setf (zcprim>art-8b-slot frob) 8b-frob)
-	  (zcprim>link-slot-web frob)
-	  8b-frob))))
-
-(defun zcprim>array-as-bytes (frob art)
-  "Common portion of ZCPRIM>ARRAY-AS-8B and ZCPRIM>ARRAY-AS-STRING."
-  (let ((scale-size (zctype>scale-size (zcprim>array-scale frob)))
-	(length (array-length frob))
-	(actual (zcprim>array-unboxed-actual frob)))
-    (make-array (* length scale-size)
-		:type art :named-structure-symbol 'cast-array
-		:displaced-to actual
-		:leader-list (zcprim>cast-array-leader-init
-			       (zcprim>array-primary frob)))))
 
 ;;; This is used by the I/O library so we can talk to the outside world in terms
 ;;; of characters.
@@ -1856,44 +1538,6 @@
       `((setf (zcprim>array-freelist-link ,var) ,freelist-var)
 	(setq ,freelist-var ,var)))))
 
-#+3600
-(defun zcprim>make-temp-displaced-array ()
-  (si:inhibit-gc-flips
-    ;; MAKE-ARRAY is very slow.
-    ;; This changed slightly for Rel7 (the index-offset field is now mandatory)
-    ;; but the change might be back-compatible (assuming not though).
-    (let ((array (si:%allocate-structure-block #+Genera 11 #-Genera 9
-					       default-cons-area)))
-      (si:%p-store-cdr-type-and-pointer array si:%header-type-array
-					si:dtp-header-i 0)
-      (setf (si:array-dispatch-field array) si:%array-dispatch-long)
-      (setf (si:array-type-field array) art-q)
-      (setf (si:array-indirect-pointer array) nil)
-      #+Genera (setf (si:array-index-offset-field array) 0)
-      (setf (si:array-long-prefix-length-field array) #+Genera 4 #-Genera 3)
-      (setf (si:array-long-leader-length-field array) (zcprim>array-leader-length))
-      (setf (si:array-dimensions-field array) 1)
-      (setf (si:array-long-length-field array) 1)
-      (setf (si:array-named-structure-bit array) 1)
-      (%p-store-data-type (locf array) si:dtp-array)
-      (setf (zcprim>array-freelist-link array) nil)
-      array)))
-
-#-3600
-(defun zcprim>make-temp-displaced-array ()
-  ;; MAKE-ARRAY is very very slow.
-  (let ((array (%allocate-and-initialize-array
-		 '#,(+ 2 (%logdpb 1 si:%%array-displaced-bit
-				  (%logdpb 1 si:%%array-number-dimensions
-					   (%logdpb 1 si:%%array-leader-bit
-						    art-q))))
-		 0 (zcprim>array-leader-length) default-cons-area
-		 (+ 5 (zcprim>array-leader-length)))))
-    (%p-store-contents-offset nil array 1)
-    (%p-store-contents-offset 0 array 2)
-    (setf (zcprim>array-freelist-link array) nil)
-    array))
-
 (defun zcprim>init-temp-displaced-array (array displaced-to length type id nss)
   ;; SI:CHANGE-INDIRECT-ARRAY is very slow -- calls EVAL??!
   (dotimes (i (array-leader-length array)) (store-array-leader nil array i))
@@ -2198,34 +1842,6 @@
   "Is FROB the internal representation of a string constant?"
   (and (listp frob) (eq (car frob) 'c:string+)))
 
-(defprim c:/#lisp
-  "Inclusion of Lisp code.  The first argument is the type, the second is any Lisp
-   form; unless the type is NIL, in which case there may be an arbitrary number of
-   forms, which will be treated as statements."
-  ((&quote type &body forms)
-   (if (null type)
-       (values forms nil)
-     (values (car forms) (zcdecl>invert-abstract-decl type **env)))))
-
-(defmacro c:/#lisp (type &body forms)
-  "Top-level inclusion of Lisp code.  This returns a Lisp form rather than a list
-   of translated expressions."
-  (ignore type)
-  `(progn ,@forms))
-
-(defun zcprim>translate-for-top-level (c-form env)
-  "Translates a C form for the C listener.  Returns two values: the translated form
-   and its type."
-  (declare (values trans-form type))
-  (nlet ((trans-form type (zcprim>with-option-bindings
-			    (zcmac>translate-exp c-form env '((:top-level))))))
-    (if (zctype>canonicalized-pointer-p type)
-	(nlet ((let-clauses array index
-		(analyze-pointer-exp trans-form type)))
-	  ;; Won't hurt to cons at this level...
-	  (values (zcprim>let-form let-clauses `(zcptr>cons ,array ,index)) type))
-      (values trans-form type))))
-
 (defprim c:quote+
   "A quoted constant, with its (translated) type."
   ((&quote const type)
@@ -2342,49 +1958,6 @@
 		   array index arefs-p)))
 	(t (values nil nil nil nil))))
 
-; This is still occasionally useful.
-(defun zcprim>canonicalize-if-needed (exp type &optional req-type)
-  "Wraps a form around EXP to canonicalize it, if TYPE is an array type."
-  (cond ((and (stringp exp) (not (zctype>array-p req-type)))
-	 `(quote ,(cons-in-area exp 0 zc-permanent-area)))
-	((and (zctype>array-p type) (not (zctype>array-p req-type)))
-	 (nlet ((let-clauses array index (analyze-pointer-exp exp type)))
-	   (zcprim>let-form let-clauses `(zcptr>cons ,array ,index))))
-	((and (zctype>zero-p type) (zctype>arith-pointer-p req-type))
-	 (zcprim>null-pointer))
-	(t exp)))
-
-(defun zcprim>scale-ptr-offset (offset type env)
-  "If a 'flat' storage representation is in use, pointer offsets have to be scaled
-   by the size of the object pointed to."
-  (if (not (zctype>pointer-p type))
-      offset
-    (zcprim>* offset (zctype>sizeof-in-scale (zctype>pointer-deref-type type) env))))
-
-(defun zcprim>unscale-ptr-difference (difference type env)
-  "If a 'flat' storage representation is in use, pointer subtraction has to divide
-   the result by the size of the object pointed to."
-  (if (not (zctype>pointer-p type))
-      difference
-    (zcprim>// difference
-	       (zctype>sizeof-in-scale (zctype>pointer-deref-type type) env))))
-
-(defun zcprim>+ (arg1 &optional arg2)
-  (cond ((null arg2) arg1)
-	((and (numberp arg1) (numberp arg2))
-	 (+ arg1 arg2))
-	((eql arg1 0) arg2)
-	((eql arg2 0) arg1)
-	((and (numberp arg1)		     ; re-associate if it helps.
-	      (listp arg2) (eq (car arg2) '+) (numberp (caddr arg2)))
-	 `(+ ,(cadr arg2) ,(+ arg1 (caddr arg2))))
-	((and (numberp arg2)		     ; and the other way.
-	      (listp arg1) (eq (car arg1) '+) (numberp (caddr arg1)))
-	 `(+ ,(cadr arg1) ,(+ arg2 (caddr arg1))))
-	;; Keep constants in the caddr for the above optimizations.
-	((numberp arg1) `(+ ,arg2 ,arg1))
-	(t `(+ ,arg1 ,arg2))))
-
 (defun zcprim>+-0-and-1 (exp)
   "Returns three values: expressions for EXP and (+ EXP 1), and let-clauses within
    which those are valid.  This performs a couple of optimizations useful when
@@ -2412,21 +1985,6 @@
 	       (and (eq (car form) '+) (eql (cadr form) -1)
 		    `(1- ,(caddr form)))))
       form))
-
-#+Symbolics (progn (compiler:add-optimizer + increment-optimization 1+ 1-)
-		   (compiler:add-optimizer - increment-optimization 1- 1+))
-; compiler:add-optimizer is advertised to do the most recently added optimizations
-; first, but it seems to do them last, so I get around it this way.
-#+MIT (progn (push 'increment-optimization (get '+ 'compiler:optimizers))
-	     (push 'increment-optimization (get '- 'compiler:optimizers)))
-; The TI system does most of this already, but misses a couple of cases.
-#+TI (progn (compiler:add-optimizer + increment-optimization 1+ 1-)
-	    (compiler:add-optimizer - increment-optimization 1- 1+))
-
-(defun zcprim>- (arg1 &optional arg2)
-  (if (null arg2)
-      (if (numberp arg1) (- arg1) `(- ,arg1))
-    (zcprim>+ arg1 (zcprim>- arg2))))
 
 (defun zcprim>* (arg1 arg2)
   (cond ((and (numberp arg1) (numberp arg2))
@@ -2537,32 +2095,6 @@
 	   (zcprim>let-form (append arg1-lets arg2-lets)
 	     `(minusp (if (minusp (logxor ,arg1 ,arg2)) ,arg2
 			(- ,arg1 ,arg2))))))))
-
-;; Thanks to Robert Cassels for this version, which seems to be adequately fast.
-;; GAAK!  This subst doesn't make temps for its args in all the right cases!
-;;(defsubst unsigned-< (a b)
-;;  (minusp (if (minusp (logxor a b))
-;;	      ;; different signs
-;;	      b
-;;	    ;; same signs [no overflow to bignums possible]
-;;	    (- a b))))
-
-(defun zcprim>fix (arg)
-  (cond ((numberp arg) (fix arg))
-	(t `(fix ,arg))))
-
-(defun zcprim>float (arg)
-  (cond ((numberp arg) (#+3600 float #-3600 small-float arg))
-	((and (listp arg)
-	      (memq (car arg) '(#-3600 small-float float #+3600 dfloat)))
-	 `(#+3600 float #-3600 small-float ,(cadr arg)))
-	(t `(#+3600 float #-3600 small-float ,arg))))
-
-(defun zcprim>dfloat (arg)
-  (cond ((numberp arg) (#+3600 dfloat #-3600 float arg))
-	((and (listp arg) (eq (car arg) #+3600 'dfloat #-3600 'float))
-	 arg)
-	(t `(#+3600 dfloat #-3600 float ,arg))))
 
 
 ; ================================================================
@@ -2860,18 +2392,3 @@
 (defun gen-label ()
   "Makes and returns a gensym for use as a PROG-label."
   (gensym "TMPLABEL-"))
-
-; Forms whose CARs are the following are invertible by SETF and LOCF,
-; and therefore are candidates for lvalues.  We maintain our own database
-; of these because of the various incompatible ways there now are to say
-; how to SETF something.
-
-(defprop zcptr>aref t zcprim>lvalue-form)
-(defprop zcptr>aref-s8b t zcprim>lvalue-form)
-(defprop zcptr>aref-s16b t zcprim>lvalue-form)
-
-(defprop aref t zcprim>lvalue-form)
-
-(defprop zcptr>load t zcprim>lvalue-form)
-
-(defprop zcptr>flat-deref t zcprim>lvalue-form)
