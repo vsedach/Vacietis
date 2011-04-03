@@ -8,5 +8,6 @@
             :serial t
             :components ((:file "package")
                          (:file "test")
-                         (:file "reader-tests"))))
+                         (:file "reader-tests")
+                         (:file "basic-tests"))))
   :depends-on (:vacietis :eos))
