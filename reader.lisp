@@ -212,13 +212,6 @@
 
 ;;; infix
 
-
-;; leave this to implementation
-;; (defun convert-assignment-op (aop lvalue rvalue)
-;;   (if (eql '= aop)
-;;       `(setf ,lvaue ,rvalue)
-;;       `(setf ,lvalue (,(intern (reverse (subseq (reverse (symbol-name aop)) 1))) ,lvalue ,rvalue))))
-
 (defun parse-nary (args)
   (flet ((split-recurse (x)
            (list (elt args x) (parse-infix (subseq args 0 x)) (parse-infix (subseq args (1+ x))))))
