@@ -58,7 +58,8 @@ bar"))
 a + b;
 }"
   (cl:defun foo (a b)
-    (cl:tagbody (+ a b))))
+    (cl:let ()
+     (cl:tagbody (+ a b)))))
 
 (reader-test function0
   "int max(int a, int b)
@@ -66,7 +67,8 @@ a + b;
 return a > b ? a : b;
 }"
   (cl:defun max (a b)
-    (cl:tagbody (return (if (> a b) a b)))))
+    (cl:let ()
+     (cl:tagbody (return (if (> a b) a b))))))
 
 (reader-test function1
   "extern int max(int a, int b)
@@ -74,7 +76,8 @@ return a > b ? a : b;
 return a > b ? a : b;
 }"
   (cl:defun max (a b)
-    (cl:tagbody (return (if (> a b) a b)))))
+    (cl:let ()
+     (cl:tagbody (return (if (> a b) a b))))))
 
 ;; (reader-test function2 ;; yes this is legal
 ;;   "extern int max(a, b)
@@ -340,14 +343,16 @@ return a > b ? a : b;
 a + b;
 }"
   (cl:defun foo ()
-    (cl:tagbody (+ a b))))
+    (cl:let ()
+     (cl:tagbody (+ a b)))))
 
 (reader-test labeled-statement1
   "void foo() {
 baz: a + b;
 }"
   (cl:defun foo ()
-    (cl:tagbody baz (+ a b))))
+    (cl:let ()
+     (cl:tagbody baz (+ a b)))))
 
 (reader-test sizeof-something
   "result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
@@ -362,3 +367,11 @@ baz: a + b;
   "*result = (int) (words << N_WIDETAG_BITS) | type;"
   (= (deref* result)
      (|\|| (<< words N_WIDETAG_BITS) type)))
+
+(reader-test function-vars0
+  "void main () {
+int x;
+}"
+  (cl:defun main ()
+    (cl:let (x)
+      (cl:tagbody (cl:setf x 0)))))

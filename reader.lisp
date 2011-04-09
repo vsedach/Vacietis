@@ -260,7 +260,9 @@
   (if (eql c #\{)
       (cons 'tagbody
             (loop with c do (setf c (next-char))
-                  until (eql c #\}) append (reverse (multiple-value-list (read-c-statement c)))))
+                  until (eql c #\}) append (reverse
+                                            (multiple-value-list
+                                             (read-c-statement c)))))
       (read-error "Expected opening brace '{' but found '~A'" c)))
 
 (defun c-type? (identifier)
@@ -293,15 +295,26 @@
                     else do (push (read-c-exp c) acc))
               (awhen (gather-acc) (list it))))))
 
+(defvar *variable-declarations*)
+
 (defun read-function (name)
   `(defun ,name ,(remove-if #'c-type? ;; do the right thing with type declarations
-                            (reduce #'append (read-comma-separated-list (next-char))))
-     ,(read-c-block (next-char))))
+                            (reduce #'append
+                                    (read-comma-separated-list (next-char))))
+     ,(let* ((*variable-declarations* ())
+             (body (read-c-block (next-char))))
+        `(let ,*variable-declarations*
+           ,body))))
 
 (defun read-variable (name)
   ;; have to deal with array declarations like *foo_bar[baz]
-  `(defvar ,name)
-  )
+  (let ((next-char (next-char)))
+    (unless (eql #\; next-char)
+      (read-error "Expecting ';', found '~a'" next-char)))
+  (if (boundp '*variable-declarations*)
+      (progn (push name *variable-declarations*)
+             `(setf ,name 0))
+      `(defvar ,name)))
 
 (defun read-declaration (token)
   (when (c-type? token)
@@ -377,7 +390,6 @@
                ;;        (otherwise (read-error stream "Expected comment"))))
                (#\" (read-c-string c))
                (#\( (read-comma-separated-list #\())
-               (#\{ (read-delimited-list #\} t)) ;; initializer list
                (#\[ (list 'aref
                           (parse-infix (loop with c do (setf c (next-char))
                                           until (eql c #\]) collect (read-c-exp c))))))))))
