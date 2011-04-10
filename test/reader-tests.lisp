@@ -376,6 +376,25 @@ int x;
     (cl:let ((x 0))
       (cl:tagbody (cl:progn (cl:setf x 0))))))
 
+(reader-test function-comments0
+  "void main () {
+/* this is a comment */
+int x;
+}"
+  (cl:defun main ()
+    (cl:let ((x 0))
+      (cl:tagbody (cl:progn (cl:setf x 0))))))
+
+(reader-test function-comments1
+  "void main () {
+/* this is a comment */
+int x;
+// this is another comment
+}"
+  (cl:defun main ()
+    (cl:let ((x 0))
+      (cl:tagbody (cl:progn (cl:setf x 0))))))
+
 (reader-test while0
   "while (fahr <= upper) {
 celsius = 5 * (fahr-32) / 9;
@@ -414,8 +433,8 @@ fahr = fahr + step;
   (cl:defun main ()
     (cl:let ((step 0) (upper 0) (lower 0) (celsius 0) (fahr 0))
       (cl:tagbody
-         (cl:progn (setf celsius 0) (setf fahr 0))
-         (cl:progn (setf step 0) (setf upper 0) (setf lower 0))
+         (cl:progn (cl:setf celsius 0) (cl:setf fahr 0))
+         (cl:progn (cl:setf step 0) (cl:setf upper 0) (cl:setf lower 0))
          (= lower 0)
          (= upper 300)
          (= step 20)

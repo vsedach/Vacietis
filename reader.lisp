@@ -3,8 +3,6 @@
 
 (declaim (optimize (debug 3)))
 
-;;; set up lists of constants for reader to use (in separate package to avoid typing package prefix)
-
 (in-package #:vacietis.c)
 
 (cl:defparameter vacietis.reader::*ops*
@@ -73,15 +71,21 @@
   `(loop with c do (setf c (c-read-char))
         ,@body))
 
-(defun whitespace? (c)
-  (or (char= c #\Space) (char= c #\Tab) (char= c #\Newline)))
-
 (defun next-char (&optional (eof-error? t))
+  "Returns the next character, skipping over whitespace and comments"
   (loop-reading
-     while (if (eq 'end c)
-               (when eof-error?
-                 (read-error "Unexpected end of file"))
-               (whitespace? c))
+     while (case c
+             (end (when eof-error?
+                    (read-error "Unexpected end of file")))
+             (#\/ (case (peek-char nil %in)
+                    (#\/ (c-read-line))
+                    (#\* (slurp-while (let ((previous-char (code-char 0)))
+                                        (lambda (c)
+                                          (prog1 (not (and (char= previous-char #\*)
+                                                           (char= c #\/)))
+                                            (setf previous-char c)))))
+                         (c-read-char))))
+             ((#\Space #\Newline #\Tab) t))
      finally (return c)))
 
 (defun make-string-buffer ()
@@ -98,10 +102,13 @@
 ;;; numbers
 
 (defun read-octal ()
-  (parse-integer (slurp-while (lambda (c) (char<= #\0 c #\7))) :radix 8))
+  (parse-integer (slurp-while (lambda (c) (char<= #\0 c #\7)))
+                 :radix 8))
 
 (defun read-hex ()
-  (parse-integer (slurp-while (lambda (c) (or (char<= #\0 c #\9) (char-not-greaterp #\A c #\F)))) :radix 16))
+  (parse-integer (slurp-while (lambda (c)
+                                (or (char<= #\0 c #\9) (char-not-greaterp #\A c #\F))))
+                 :radix 16))
 
 (defun read-float (prefix separator)
   (let ((*readtable* (find-readtable :common-lisp)))
@@ -341,7 +348,7 @@
 
 (defun read-c-statement (c)
   (let ((next-token (read-c-exp c)))
-    ;; m-v-b is here because OR doesn't return multiple values except for last expression
+    ;; m-v-b is here because OR only returns multiple values for last expression
     (multiple-value-bind (statement label) (read-labeled-statement next-token)
       (if statement
           (values statement label)
@@ -349,7 +356,8 @@
               (read-control-flow-statement next-token)
               (parse-infix (cons next-token
                                  (loop with c do (setf c (next-char))
-                                    until (eql c #\;) collect (read-c-exp c)))))))))
+                                    until (eql c #\;)
+                                    collect (read-c-exp c)))))))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
@@ -367,7 +375,9 @@
 ;; also if CLISP didn't have bugs w/unread-char after peek and near EOF
 (defun match-longest-op (one)
   (flet ((seq-matches (&rest chars)
-           (find (make-array (length chars) :element-type 'character :initial-contents chars)
+           (find (make-array (length chars)
+                             :element-type 'character
+                             :initial-contents chars)
                  *ops* :test #'string= :key #'symbol-name)))
     (let* ((two       (c-read-char))
            (two-match (seq-matches one two)))
@@ -387,22 +397,12 @@
              (case c
                ;; (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
                ;;        (read-c-macro stream)))
-               ;; (#\/ (c-read-char stream) ;; comment
-               ;;      (case (c-read-char stream)
-               ;;        (#\/ (c-read-line stream))
-               ;;        (#\* (slurp-while stream
-               ;;                          (let ((previous-char (code-char 0)))
-               ;;                            (lambda (c)
-               ;;                              (prog1 (not (and (char= previous-char #\*)
-               ;;                                               (char= c #\/)))
-               ;;                                (setf previous-char c)))))
-               ;;             (c-read-char stream))
-               ;;        (otherwise (read-error stream "Expected comment"))))
                (#\" (read-c-string c))
                (#\( (read-comma-separated-list #\())
                (#\[ (list 'aref
                           (parse-infix (loop with c do (setf c (next-char))
-                                          until (eql c #\]) collect (read-c-exp c))))))))))
+                                          until (eql c #\])
+                                          collect (read-c-exp c))))))))))
 
 ;;; readtable
 
