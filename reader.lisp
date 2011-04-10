@@ -273,16 +273,21 @@
   (read-c-exp (next-char)))
 
 (defun read-control-flow-statement (statement)
-  (case statement
-    (vacietis.c:if
-     (list 'vacietis.c:if
-           (parse-infix (next-exp))
-           (let ((next-char (next-char)))
-             (if (eql next-char #\{)
-                 (read-c-block next-char)
-                 (read-c-statement next-char)))))
-    (vacietis.c:return
-      (list 'vacietis.c:return (read-c-statement (next-char))))))
+  (macrolet ((control-flow-case (statement &body cases)
+               `(case ,statement
+                  ,@(loop for (symbol . body) in cases collect
+                         `(,symbol (list ',symbol ,@body))))))
+    (flet ((read-block-or-statement ()
+             (let ((next-char (next-char)))
+               (if (eql next-char #\{)
+                   (read-c-block next-char)
+                   (read-c-statement next-char)))))
+     (control-flow-case statement
+       (vacietis.c:if (parse-infix (next-exp))
+                      (read-block-or-statement))
+       (vacietis.c:return (read-c-statement (next-char)))
+       (vacietis.c:while (parse-infix (next-exp))
+                         (read-block-or-statement))))))
 
 (defun read-comma-separated-list (open-delimiter)
   (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\})))
@@ -306,23 +311,28 @@
         `(let ,*variable-declarations*
            ,body))))
 
-(defun read-variable (name)
+(defun read-variable-declaration (first-name)
   ;; have to deal with array declarations like *foo_bar[baz]
-  (let ((next-char (next-char)))
-    (unless (eql #\; next-char)
-      (read-error "Expecting ';', found '~a'" next-char)))
-  (if (boundp '*variable-declarations*)
-      (progn (push name *variable-declarations*)
-             `(setf ,name 0))
-      `(defvar ,name)))
+  (labels ((declare-var (name)
+             (if (boundp '*variable-declarations*)
+                 (progn (push (list name 0) *variable-declarations*)
+                        `(setf ,name 0))
+                 `(defvar ,name)))
+           (read-decl (declared)
+             (acase (next-char)
+               (#\; declared)
+               (#\, (read-decl declared))
+               (t   (read-decl (cons (declare-var (read-c-exp it)) declared))))))
+    (cons 'progn (read-decl (list (declare-var first-name))))))
 
 (defun read-declaration (token)
   (when (c-type? token)
     (let ((name (loop with x do (setf x (next-exp))
-                      while (or (eql 'vacietis.c::* x) (c-type? x)) finally (return x)))) ;; throw away type info
+                      while (or (eql 'vacietis.c::* x) (c-type? x))
+                      finally (return x)))) ;; throw away type info
       (if (eql #\( (peek-char t %in))
           (read-function name)
-          (read-variable name)))))
+          (read-variable-declaration name)))))
 
 (defun read-labeled-statement (token)
   (when (eql #\: (peek-char t %in))

@@ -49,7 +49,7 @@ bar"))
 
 (reader-test int-var1
   "int x;"
-  (cl:defvar x))
+  (cl:progn (cl:defvar x)))
 
 ;;; function definition
 
@@ -290,7 +290,7 @@ return a > b ? a : b;
 
 (reader-test declare-pointer0
   "int *result;"
-  (cl:defvar result))
+  (cl:progn (cl:defvar result)))
 
 (reader-test ptr-ptr-cast
   "(int *)((char *)result + bytes);"
@@ -373,5 +373,55 @@ baz: a + b;
 int x;
 }"
   (cl:defun main ()
-    (cl:let (x)
-      (cl:tagbody (cl:setf x 0)))))
+    (cl:let ((x 0))
+      (cl:tagbody (cl:progn (cl:setf x 0))))))
+
+(reader-test while0
+  "while (fahr <= upper) {
+celsius = 5 * (fahr-32) / 9;
+printf(\"%d\t%d\n\", fahr, celsius);
+fahr = fahr + step;
+}"
+  (while (<= fahr upper)
+    (cl:tagbody
+       (= celsius (* 5 (/ (- fahr 32) 9)))
+       (printf "%dt%dn" fahr celsius)
+       (= fahr (+ fahr step)))))
+
+(reader-test multiple-declaration0
+  "int x, y;"
+  (cl:progn (cl:defvar y) (cl:defvar x)))
+
+(reader-test k&r-pg12
+  "void main()
+{
+int fahr, celsius;
+int lower, upper, step;
+lower = 0;
+upper = 300;
+step = 20;
+/* lower limit of temperature scale */
+/* upper limit */
+/* step size */
+fahr = lower;
+while (fahr <= upper) {
+celsius = 5 * (fahr-32) / 9;
+printf(\"%d\t%d\n\", fahr, celsius);
+fahr = fahr + step;
+}
+}
+"
+  (cl:defun main ()
+    (cl:let ((step 0) (upper 0) (lower 0) (celsius 0) (fahr 0))
+      (cl:tagbody
+         (cl:progn (setf celsius 0) (setf fahr 0))
+         (cl:progn (setf step 0) (setf upper 0) (setf lower 0))
+         (= lower 0)
+         (= upper 300)
+         (= step 20)
+         (= fahr lower)
+         (while (<= fahr upper)
+           (cl:tagbody
+              (= celsius (* 5 (/ (- fahr 32) 9)))
+              (printf "%dt%dn" fahr celsius)
+              (= fahr (+ fahr step))))))))
