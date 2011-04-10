@@ -411,6 +411,18 @@ fahr = fahr + step;
   "int x, y;"
   (cl:progn (cl:defvar y) (cl:defvar x)))
 
+(reader-test k&r-pg9
+  "void main()
+{
+printf(\"hello, world\\n\");
+}
+"
+  (cl:defun main ()
+    (cl:let ()
+      (cl:tagbody
+         (printf "hello, world
+")))))
+
 (reader-test k&r-pg12
   "void main()
 {
@@ -444,3 +456,24 @@ fahr = fahr + step;
               (= celsius (* 5 (/ (- fahr 32) 9)))
               (printf "%dt%dn" fahr celsius)
               (= fahr (+ fahr step))))))))
+
+(reader-test k&r-pg16
+  "void main()
+{
+int fahr;
+for (fahr = 0; fahr <= 300; fahr = fahr + 20)
+printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
+}
+"
+  (cl:defun main ()
+    (cl:let ((fahr 0))
+      (cl:tagbody
+         (cl:progn (cl:setf fahr 0))
+         (for ((= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
+              (printf "%3d %6.1f
+"
+                      fahr (* (/ 5.0 9.0) (- fahr 32))))))))
+
+;; (reader-test c99-style-for-init
+;;   "for (int x = 0; x < 10; x++)
+;; x++;")

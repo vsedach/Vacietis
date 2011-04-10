@@ -144,3 +144,16 @@
                                ,rvalue))))))
 
 (unroll-assignment-ops += -= *= /= %= <<= >>= &= ^= |\|=|)
+
+;;; iteration
+
+(defmacro vacietis.c:for ((initialization test increment) &body body)
+  `(tagbody ,initialization
+      loop
+      (when (eql 0 ,test)
+        (go break))
+      ,@body
+      continue
+      ,increment
+      (go loop)
+      break))

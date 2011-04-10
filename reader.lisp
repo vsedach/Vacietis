@@ -281,29 +281,34 @@
 
 (defun read-control-flow-statement (statement)
   (macrolet ((control-flow-case (statement &body cases)
-               `(case ,statement
-                  ,@(loop for (symbol . body) in cases collect
-                         `(,symbol (list ',symbol ,@body))))))
+               `(acase ,statement
+                  ,@(loop for (symbols . body) in cases
+                          collect `(,symbols (cons it (list ,@body)))))))
     (flet ((read-block-or-statement ()
              (let ((next-char (next-char)))
                (if (eql next-char #\{)
                    (read-c-block next-char)
                    (read-c-statement next-char)))))
      (control-flow-case statement
-       (vacietis.c:if (parse-infix (next-exp))
-                      (read-block-or-statement))
        (vacietis.c:return (read-c-statement (next-char)))
-       (vacietis.c:while (parse-infix (next-exp))
-                         (read-block-or-statement))))))
+       (vacietis.c:if     (parse-infix (next-exp))
+                          (read-block-or-statement))
+       (vacietis.c:while  (parse-infix (next-exp))
+                          (read-block-or-statement))
+       (vacietis.c:for    (let ((exp (c-read-delimited-list (next-char) #\;)))
+                            (if (= 3 (length exp))
+                                (mapcar #'parse-infix exp)
+                                (read-error "Malformed for expression: ~a" exp)))
+                          (read-block-or-statement))))))
 
-(defun read-comma-separated-list (open-delimiter)
+(defun c-read-delimited-list (open-delimiter separator)
   (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\})))
         (acc ()))
     (flet ((gather-acc ()
              (prog1 (reverse acc) (setf acc ()))))
       (append (loop with c do (setf c (next-char))
                     until (eql c close-delimiter)
-                    if (eql #\, c) collect (gather-acc)
+                    if (eql separator c) collect (gather-acc)
                     else do (push (read-c-exp c) acc))
               (awhen (gather-acc) (list it))))))
 
@@ -312,7 +317,7 @@
 (defun read-function (name)
   `(defun ,name ,(remove-if #'c-type? ;; do the right thing with type declarations
                             (reduce #'append
-                                    (read-comma-separated-list (next-char))))
+                                    (c-read-delimited-list (next-char) #\,)))
      ,(let* ((*variable-declarations* ())
              (body (read-c-block (next-char))))
         `(let ,*variable-declarations*
@@ -398,7 +403,7 @@
                ;; (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
                ;;        (read-c-macro stream)))
                (#\" (read-c-string c))
-               (#\( (read-comma-separated-list #\())
+               (#\( (c-read-delimited-list #\( #\,))
                (#\[ (list 'aref
                           (parse-infix (loop with c do (setf c (next-char))
                                           until (eql c #\])
