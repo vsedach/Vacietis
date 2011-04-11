@@ -265,11 +265,10 @@
 
 (defun read-c-block (c)
   (if (eql c #\{)
-      (cons 'tagbody
-            (loop with c do (setf c (next-char))
-                  until (eql c #\}) append (reverse
-                                            (multiple-value-list
-                                             (read-c-statement c)))))
+      (loop with c do (setf c (next-char))
+            until (eql c #\}) append (reverse
+                                      (multiple-value-list
+                                       (read-c-statement c))))
       (read-error "Expected opening brace '{' but found '~A'" c)))
 
 (defun c-type? (identifier)
@@ -283,16 +282,16 @@
   (macrolet ((control-flow-case (statement &body cases)
                `(acase ,statement
                   ,@(loop for (symbols . body) in cases
-                          collect `(,symbols (cons it (list ,@body)))))))
+                          collect `(,symbols (list* it ,@body))))))
     (flet ((read-block-or-statement ()
              (let ((next-char (next-char)))
                (if (eql next-char #\{)
                    (read-c-block next-char)
-                   (read-c-statement next-char)))))
+                   (list (read-c-statement next-char))))))
      (control-flow-case statement
-       (vacietis.c:return (read-c-statement (next-char)))
+       (vacietis.c:return (list (read-c-statement (next-char))))
        (vacietis.c:if     (parse-infix (next-exp))
-                          (read-block-or-statement))
+                          (list (read-block-or-statement)))
        (vacietis.c:while  (parse-infix (next-exp))
                           (read-block-or-statement))
        (vacietis.c:for    (let ((exp (c-read-delimited-list (next-char) #\;)))
@@ -315,13 +314,13 @@
 (defvar *variable-declarations*)
 
 (defun read-function (name)
-  `(defun ,name ,(remove-if #'c-type? ;; do the right thing with type declarations
-                            (reduce #'append
-                                    (c-read-delimited-list (next-char) #\,)))
-     ,(let* ((*variable-declarations* ())
+  `(vacietis::c-fun ,name
+      ,(remove-if #'c-type? ;; do the right thing with type declarations
+                  (reduce #'append
+                          (c-read-delimited-list (next-char) #\,)))
+    ,@(let* ((*variable-declarations* ())
              (body (read-c-block (next-char))))
-        `(let ,*variable-declarations*
-           ,body))))
+        (cons *variable-declarations* body))))
 
 (defun read-variable-declaration (first-name)
   ;; have to deal with array declarations like *foo_bar[baz]

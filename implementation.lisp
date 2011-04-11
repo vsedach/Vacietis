@@ -157,3 +157,27 @@
       ,increment
       (go loop)
       break))
+
+(defmacro vacietis.c:while (test &body body)
+  `(vacietis.c:for (nil ,test nil) ,@body))
+
+(defmacro vacietis.c:do (test &body body)
+  `(tagbody loop
+      ,@body
+      continue
+      (if (eql 0 ,test)
+          (go break)
+          (go loop))
+      break))
+
+;;; control flow
+
+(defmacro vacietis.c:if (test then-statements &rest clauses)
+  `(if ,test
+       (tagbody ,@then-statements)))
+
+;;; declarations
+
+(defmacro c-fun (name arglist vars &body body)
+  `(defun ,name ,arglist
+     (prog* ,vars ,@body)))

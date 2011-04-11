@@ -57,27 +57,24 @@ bar"))
   "void foo(int a, int b) {
 a + b;
 }"
-  (cl:defun foo (a b)
-    (cl:let ()
-     (cl:tagbody (+ a b)))))
+  (vacietis::c-fun foo (a b) ()
+    (+ a b)))
 
 (reader-test function0
   "int max(int a, int b)
 {
 return a > b ? a : b;
 }"
-  (cl:defun max (a b)
-    (cl:let ()
-     (cl:tagbody (return (if (> a b) a b))))))
+  (vacietis::c-fun max (a b) ()
+    (return (if (> a b) a b))))
 
 (reader-test function1
   "extern int max(int a, int b)
 {
 return a > b ? a : b;
 }"
-  (cl:defun max (a b)
-    (cl:let ()
-     (cl:tagbody (return (if (> a b) a b))))))
+  (vacietis::c-fun max (a b) ()
+    (return (if (> a b) a b))))
 
 ;; (reader-test function2 ;; yes this is legal
 ;;   "extern int max(a, b)
@@ -225,11 +222,11 @@ return a > b ? a : b;
 
 (reader-test if-foo1
   "if foo { 1 + 2; }"
-  (if foo (cl:tagbody (+ 1 2))))
+  (if foo ((+ 1 2))))
 
 (reader-test if-foo2
   "if foo 1 + 2;"
-  (if foo (+ 1 2)))
+  (if foo ((+ 1 2))))
 
 (reader-test big-if
   "if ((SymbolValue(GC_PENDING,th) == NIL) &&
@@ -242,10 +239,9 @@ return a > b ? a : b;
   (if (&& (== (SymbolValue GC_PENDING th) NIL)
           (&& (== (SymbolValue GC_INHIBIT th) NIL)
               (< (random) (/ RAND_MAX 100))))
-      (cl:tagbody
-        (SetSymbolValue GC_PENDING T th)
-        (set_pseudo_atomic_interrupted th)
-        (maybe_save_gc_mask_and_block_deferrables NULL))))
+      ((SetSymbolValue GC_PENDING T th)
+       (set_pseudo_atomic_interrupted th)
+       (maybe_save_gc_mask_and_block_deferrables NULL))))
 
 (reader-test smaller-if
   "if ((SymbolValue(GC_PENDING,th) == NIL) &&
@@ -256,7 +252,7 @@ return a > b ? a : b;
   (if (&& (== (SymbolValue GC_PENDING th) NIL)
           (&& (== (SymbolValue GC_INHIBIT th) NIL)
               (< (random) (/ RAND_MAX 100))))
-      (cl:tagbody 1)))
+      (1)))
 
 ;;; casts and pointers
 
@@ -330,9 +326,8 @@ return a > b ? a : b;
                             - (char *)current_dynamic_space);
     }"
   (if (&& current_auto_gc_trigger (> dynamic_space_free_pointer current_auto_gc_trigger))
-      (cl:tagbody
-        (clear_auto_gc_trigger)
-        (set_auto_gc_trigger (- dynamic_space_free_pointer current_dynamic_space)))))
+      ((clear_auto_gc_trigger)
+       (set_auto_gc_trigger (- dynamic_space_free_pointer current_dynamic_space)))))
 
 (reader-test deref-increment
   "*x++;"
@@ -342,17 +337,15 @@ return a > b ? a : b;
   "void foo() {
 a + b;
 }"
-  (cl:defun foo ()
-    (cl:let ()
-     (cl:tagbody (+ a b)))))
+  (vacietis::c-fun foo () ()
+    (+ a b)))
 
 (reader-test labeled-statement1
   "void foo() {
 baz: a + b;
 }"
-  (cl:defun foo ()
-    (cl:let ()
-     (cl:tagbody baz (+ a b)))))
+  (vacietis::c-fun foo () ()
+    baz (+ a b)))
 
 (reader-test sizeof-something
   "result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
@@ -372,18 +365,16 @@ baz: a + b;
   "void main () {
 int x;
 }"
-  (cl:defun main ()
-    (cl:let ((x 0))
-      (cl:tagbody (cl:progn (cl:setf x 0))))))
+  (vacietis::c-fun main () ((x 0))
+    (cl:progn (cl:setf x 0))))
 
 (reader-test function-comments0
   "void main () {
 /* this is a comment */
 int x;
 }"
-  (cl:defun main ()
-    (cl:let ((x 0))
-      (cl:tagbody (cl:progn (cl:setf x 0))))))
+  (vacietis::c-fun main () ((x 0))
+    (cl:progn (cl:setf x 0))))
 
 (reader-test function-comments1
   "void main () {
@@ -391,9 +382,8 @@ int x;
 int x;
 // this is another comment
 }"
-  (cl:defun main ()
-    (cl:let ((x 0))
-      (cl:tagbody (cl:progn (cl:setf x 0))))))
+  (vacietis::c-fun main () ((x 0))
+      (cl:progn (cl:setf x 0))))
 
 (reader-test while0
   "while (fahr <= upper) {
@@ -402,10 +392,9 @@ printf(\"%d\t%d\n\", fahr, celsius);
 fahr = fahr + step;
 }"
   (while (<= fahr upper)
-    (cl:tagbody
-       (= celsius (* 5 (/ (- fahr 32) 9)))
-       (printf "%dt%dn" fahr celsius)
-       (= fahr (+ fahr step)))))
+    (= celsius (* 5 (/ (- fahr 32) 9)))
+    (printf "%dt%dn" fahr celsius)
+    (= fahr (+ fahr step))))
 
 (reader-test multiple-declaration0
   "int x, y;"
@@ -417,11 +406,9 @@ fahr = fahr + step;
 printf(\"hello, world\\n\");
 }
 "
-  (cl:defun main ()
-    (cl:let ()
-      (cl:tagbody
-         (printf "hello, world
-")))))
+  (vacietis::c-fun main () ()
+    (printf "hello, world
+")))
 
 (reader-test k&r-pg12
   "void main()
@@ -442,20 +429,17 @@ fahr = fahr + step;
 }
 }
 "
-  (cl:defun main ()
-    (cl:let ((step 0) (upper 0) (lower 0) (celsius 0) (fahr 0))
-      (cl:tagbody
-         (cl:progn (cl:setf celsius 0) (cl:setf fahr 0))
-         (cl:progn (cl:setf step 0) (cl:setf upper 0) (cl:setf lower 0))
-         (= lower 0)
-         (= upper 300)
-         (= step 20)
-         (= fahr lower)
-         (while (<= fahr upper)
-           (cl:tagbody
-              (= celsius (* 5 (/ (- fahr 32) 9)))
-              (printf "%dt%dn" fahr celsius)
-              (= fahr (+ fahr step))))))))
+  (vacietis::c-fun main () ((step 0) (upper 0) (lower 0) (celsius 0) (fahr 0))
+    (cl:progn (cl:setf celsius 0) (cl:setf fahr 0))
+    (cl:progn (cl:setf step 0) (cl:setf upper 0) (cl:setf lower 0))
+    (= lower 0)
+    (= upper 300)
+    (= step 20)
+    (= fahr lower)
+    (while (<= fahr upper)
+      (= celsius (* 5 (/ (- fahr 32) 9)))
+      (printf "%dt%dn" fahr celsius)
+      (= fahr (+ fahr step)))))
 
 (reader-test k&r-pg16
   "void main()
@@ -465,15 +449,44 @@ for (fahr = 0; fahr <= 300; fahr = fahr + 20)
 printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
 }
 "
-  (cl:defun main ()
-    (cl:let ((fahr 0))
-      (cl:tagbody
-         (cl:progn (cl:setf fahr 0))
-         (for ((= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
-              (printf "%3d %6.1f
+  (vacietis::c-fun main () ((fahr 0))
+    (cl:progn (cl:setf fahr 0))
+    (for ((= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
+         (printf "%3d %6.1f
 "
-                      fahr (* (/ 5.0 9.0) (- fahr 32))))))))
+                 fahr (* (/ 5.0 9.0) (- fahr 32))))))
 
 ;; (reader-test c99-style-for-init
 ;;   "for (int x = 0; x < 10; x++)
 ;; x++;")
+
+;; (reader-test k&r-pg18
+;;   "void main()
+;; {
+;; int c;
+;; c = getchar();
+;; while (c != EOF) {
+;;   putchar(c);
+;;   c = getchar();
+;; }
+;; }
+;; "
+;;   )
+
+;; (reader-test h&s-while1
+;;   "int pow(int base, int exponent)
+;; {
+;;     int result = 1;
+;;     while (exponent > 0) {
+;;         if ( exponent % 2 ) result *= base;
+;;         base *= base;
+;;         exponent /= 2;
+;;     }
+;;     return result;
+;; }")
+
+;; (reader-test h&s-while2
+;;   "while ( *char_pointer++ );")
+
+;; (reader-test h&s-while3
+;;   "while ( *dest_pointer++ = *source_pointer++ );")
