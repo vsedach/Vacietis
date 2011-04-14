@@ -6,7 +6,7 @@
 (in-package #:vacietis.c)
 
 (cl:defparameter vacietis.reader::*ops*
-  '(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / ! ~ -> |.|))
+  '(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / % ! ~ -> |.|))
 
 (cl:defparameter vacietis.reader::*prefix-ops* '(++ -- ~ ! - + & *))
 
@@ -24,7 +24,7 @@
     < > <= >=
     << >>  ; ash
     + -
-    * / &))
+    * / %))
 
 (cl:defparameter vacietis.reader::*basic-c-types* '(int static void const signed unsigned short long float double char extern))
 
@@ -327,9 +327,14 @@
   (let (vars-declared?)
    (labels ((declare-var (name)
               (setf vars-declared? t)
-              (if (boundp '*variable-declarations*)
-                  (progn (push (list name 0) *variable-declarations*) '())
-                  `((defvar ,name))))
+              (let ((initial-value (when (eql #\= (peek-char t %in))
+                                     (next-char)
+                                     (read-c-exp (next-char)))))
+                (if (boundp '*variable-declarations*)
+                    (progn (push (list name 0) *variable-declarations*)
+                           (when initial-value
+                             `((setf ,name ,initial-value))))
+                    `((defvar ,name ,(or initial-value 0))))))
             (read-decl (declared)
               (acase (next-char)
                 (#\; declared)

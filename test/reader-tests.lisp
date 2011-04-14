@@ -49,7 +49,7 @@ bar"))
 
 (reader-test int-var1
   "int x;"
-  (cl:progn (cl:defvar x)))
+  (cl:progn (cl:defvar x 0)))
 
 ;;; function definition
 
@@ -278,7 +278,7 @@ return a > b ? a : b;
 
 (reader-test declare-pointer0
   "int *result;"
-  (cl:progn (cl:defvar result)))
+  (cl:progn (cl:defvar result 0)))
 
 (reader-test ptr-ptr-cast
   "(int *)((char *)result + bytes);"
@@ -390,7 +390,7 @@ fahr = fahr + step;
 
 (reader-test multiple-declaration0
   "int x, y;"
-  (cl:progn (cl:defvar y) (cl:defvar x)))
+  (cl:progn (cl:defvar y 0) (cl:defvar x 0)))
 
 (reader-test k&r-pg9
   "void main()
@@ -466,17 +466,32 @@ while (c != EOF) {
       (putchar c)
       (= c (getchar)))))
 
-;; (reader-test h&s-while1
-;;   "int pow(int base, int exponent)
-;; {
-;;     int result = 1;
-;;     while (exponent > 0) {
-;;         if ( exponent % 2 ) result *= base;
-;;         base *= base;
-;;         exponent /= 2;
-;;     }
-;;     return result;
-;; }")
+(reader-test var-declare-and-initialize0
+  "int x = 1;"
+  (cl:progn (cl:defvar x 1)))
+
+(reader-test modulo0
+  "1 % 2;"
+  (% 1 2))
+
+(reader-test h&s-while1
+  "int pow(int base, int exponent)
+{
+    int result = 1;
+    while (exponent > 0) {
+        if ( exponent % 2 ) result *= base;
+        base *= base;
+        exponent /= 2;
+    }
+    return result;
+}"
+  (vacietis::c-fun pow (base exponent) ((result 0))
+    (cl:progn (cl:setf result 1))
+    (while (> exponent 0)
+      (if (% exponent 2) ((*= result base)))
+      (*= base base)
+      (/= exponent 2))
+    (return result)))
 
 ;; (reader-test h&s-while2
 ;;   "while ( *char_pointer++ );")
