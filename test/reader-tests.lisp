@@ -76,14 +76,6 @@ return a > b ? a : b;
   (vacietis::c-fun max (a b) ()
     (return (if (> a b) a b))))
 
-;; (reader-test function2 ;; yes this is legal
-;;   "extern int max(a, b)
-;; int a, b;
-;; {
-;; return a > b ? a : b;
-;; }
-;; ")
-
 ;;; function calls
 
 (reader-test funcall-args0
@@ -366,7 +358,7 @@ baz: a + b;
 int x;
 }"
   (vacietis::c-fun main () ((x 0))
-    (cl:progn (cl:setf x 0))))
+    ))
 
 (reader-test function-comments0
   "void main () {
@@ -374,7 +366,7 @@ int x;
 int x;
 }"
   (vacietis::c-fun main () ((x 0))
-    (cl:progn (cl:setf x 0))))
+    ))
 
 (reader-test function-comments1
   "void main () {
@@ -383,7 +375,7 @@ int x;
 // this is another comment
 }"
   (vacietis::c-fun main () ((x 0))
-      (cl:progn (cl:setf x 0))))
+    ))
 
 (reader-test while0
   "while (fahr <= upper) {
@@ -430,8 +422,6 @@ fahr = fahr + step;
 }
 "
   (vacietis::c-fun main () ((step 0) (upper 0) (lower 0) (celsius 0) (fahr 0))
-    (cl:progn (cl:setf celsius 0) (cl:setf fahr 0))
-    (cl:progn (cl:setf step 0) (cl:setf upper 0) (cl:setf lower 0))
     (= lower 0)
     (= upper 300)
     (= step 20)
@@ -450,7 +440,6 @@ printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
 }
 "
   (vacietis::c-fun main () ((fahr 0))
-    (cl:progn (cl:setf fahr 0))
     (for ((= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
          (printf "%3d %6.1f
 "
@@ -460,18 +449,22 @@ printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
 ;;   "for (int x = 0; x < 10; x++)
 ;; x++;")
 
-;; (reader-test k&r-pg18
-;;   "void main()
-;; {
-;; int c;
-;; c = getchar();
-;; while (c != EOF) {
-;;   putchar(c);
-;;   c = getchar();
-;; }
-;; }
-;; "
-;;   )
+(reader-test k&r-pg18
+  "void main()
+{
+int c;
+c = getchar();
+while (c != EOF) {
+  putchar(c);
+  c = getchar();
+}
+}
+"
+  (vacietis::c-fun main () ((c 0))
+    (= c (getchar))
+    (while (!= c EOF)
+      (putchar c)
+      (= c (getchar)))))
 
 ;; (reader-test h&s-while1
 ;;   "int pow(int base, int exponent)

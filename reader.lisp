@@ -324,17 +324,22 @@
 
 (defun read-variable-declaration (first-name)
   ;; have to deal with array declarations like *foo_bar[baz]
-  (labels ((declare-var (name)
-             (if (boundp '*variable-declarations*)
-                 (progn (push (list name 0) *variable-declarations*)
-                        `(setf ,name 0))
-                 `(defvar ,name)))
-           (read-decl (declared)
-             (acase (next-char)
-               (#\; declared)
-               (#\, (read-decl declared))
-               (t   (read-decl (cons (declare-var (read-c-exp it)) declared))))))
-    (cons 'progn (read-decl (list (declare-var first-name))))))
+  (let (vars-declared?)
+   (labels ((declare-var (name)
+              (setf vars-declared? t)
+              (if (boundp '*variable-declarations*)
+                  (progn (push (list name 0) *variable-declarations*) '())
+                  `((defvar ,name))))
+            (read-decl (declared)
+              (acase (next-char)
+                (#\; declared)
+                (#\, (read-decl declared))
+                (t   (read-decl (append (declare-var (read-c-exp it)) declared))))))
+     (let ((initializations (read-decl (declare-var first-name))))
+       (when vars-declared?
+         (if initializations
+             (cons 'progn initializations)
+             t))))))
 
 (defun read-declaration (token)
   (when (c-type? token)
@@ -352,16 +357,14 @@
 
 (defun read-c-statement (c)
   (let ((next-token (read-c-exp c)))
-    ;; m-v-b is here because OR only returns multiple values for last expression
     (multiple-value-bind (statement label) (read-labeled-statement next-token)
-      (if statement
-          (values statement label)
-          (or (read-declaration next-token)
-              (read-control-flow-statement next-token)
-              (parse-infix (cons next-token
+      (acond (statement (values statement label))
+             ((read-declaration next-token) (if (eq t it) (values) it))
+             (t (or (read-control-flow-statement next-token)
+                    (parse-infix (cons next-token
                                  (loop with c do (setf c (next-char))
                                     until (eql c #\;)
-                                    collect (read-c-exp c)))))))))
+                                    collect (read-c-exp c))))))))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
