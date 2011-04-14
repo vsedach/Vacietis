@@ -493,8 +493,22 @@ while (c != EOF) {
       (/= exponent 2))
     (return result)))
 
-;; (reader-test h&s-while2
-;;   "while ( *char_pointer++ );")
+(reader-test empty-label
+  "int main () { end:; }"
+  (vacietis::c-fun main () ()
+    end
+    cl:nil))
 
-;; (reader-test h&s-while3
-;;   "while ( *dest_pointer++ = *source_pointer++ );")
+(reader-test h&s-while2
+  "while ( *char_pointer++ );"
+  (while (deref* (post++ char_pointer))
+    cl:nil))
+
+(reader-test h&s-while3
+  "while ( *dest_pointer++ = *source_pointer++ );"
+  (while (= (deref* (post++ dest_pointer)) (deref* (post++ source_pointer)))
+    cl:nil))
+
+(reader-test just-return
+  "return;"
+  (return cl:nil))

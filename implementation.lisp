@@ -176,6 +176,9 @@
   `(if ,test
        (tagbody ,@then-statements)))
 
+(defmacro vacietis.c:return (&optional value)
+  `(return ,(or value 0)))
+
 ;;; declarations
 
 (defmacro c-fun (name arglist vars &body body)

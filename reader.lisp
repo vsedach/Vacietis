@@ -361,15 +361,16 @@
     (values (read-c-statement (next-char)) token)))
 
 (defun read-c-statement (c)
-  (let ((next-token (read-c-exp c)))
-    (multiple-value-bind (statement label) (read-labeled-statement next-token)
-      (acond (statement (values statement label))
-             ((read-declaration next-token) (if (eq t it) (values) it))
-             (t (or (read-control-flow-statement next-token)
-                    (parse-infix (cons next-token
-                                 (loop with c do (setf c (next-char))
-                                    until (eql c #\;)
-                                    collect (read-c-exp c))))))))))
+  (unless (eql #\; c)
+   (let ((next-token (read-c-exp c)))
+     (multiple-value-bind (statement label) (read-labeled-statement next-token)
+       (acond (label (values statement label))
+              ((read-declaration next-token) (if (eq t it) (values) it))
+              (t (or (read-control-flow-statement next-token)
+                     (parse-infix (cons next-token
+                                        (loop with c do (setf c (next-char))
+                                           until (eql c #\;)
+                                           collect (read-c-exp c)))))))))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
