@@ -3,6 +3,13 @@
 
 (declaim (optimize (debug 3)))
 
+;;; unary operators
+
+(defmacro def-unary-op (c lisp)
+  (let ((x (gensym)))
+   `(defmacro ,c (,x)
+      `(,',lisp ,,x))))
+
 ;;; storage units
 
 ;; (defmacro sizeof (x)
@@ -36,9 +43,7 @@
   %    rem
   )
 
-(declaim (inline vacietis.c:~))
-(defun vacietis.c:~ (x)
-  (lognot x))
+(def-unary-op vacietis.c:~ lognot)
 
 ;;; pointers
 
@@ -145,18 +150,28 @@
 
 (unroll-assignment-ops += -= *= /= %= <<= >>= &= ^= |\|=|)
 
+(def-unary-op vacietis.c:++ incf)
+(def-unary-op vacietis.c:-- decf)
+
+(defmacro vacietis.c:post++ (x)
+  `(prog1 ,x (incf ,x)))
+
+(defmacro vacietis.c:post-- (x)
+  `(prog1 ,x (decf ,x)))
+
 ;;; iteration
 
-(defmacro vacietis.c:for ((initialization test increment) &body body)
-  `(tagbody ,initialization
+(defmacro vacietis.c:for ((bindings initialization test increment) &body body)
+  `(let ,bindings
+     (tagbody ,initialization
       loop
-      (when (eql 0 ,test)
-        (go break))
-      ,@body
+        (when (eql 0 ,test)
+          (go break))
+        ,@body
       continue
-      ,increment
-      (go loop)
-      break))
+        ,increment
+        (go loop)
+      break)))
 
 (defmacro vacietis.c:while (test &body body)
   `(vacietis.c:for (nil ,test nil) ,@body))
@@ -164,11 +179,11 @@
 (defmacro vacietis.c:do (test &body body)
   `(tagbody loop
       ,@body
-      continue
+    continue
       (if (eql 0 ,test)
           (go break)
           (go loop))
-      break))
+    break))
 
 ;;; control flow
 

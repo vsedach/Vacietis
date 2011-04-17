@@ -49,7 +49,7 @@ bar"))
 
 (reader-test int-var1
   "int x;"
-  (cl:progn (cl:defvar x 0)))
+  (cl:progn (cl:defparameter x 0)))
 
 ;;; function definition
 
@@ -278,7 +278,7 @@ return a > b ? a : b;
 
 (reader-test declare-pointer0
   "int *result;"
-  (cl:progn (cl:defvar result 0)))
+  (cl:progn (cl:defparameter result 0)))
 
 (reader-test ptr-ptr-cast
   "(int *)((char *)result + bytes);"
@@ -390,7 +390,7 @@ fahr = fahr + step;
 
 (reader-test multiple-declaration0
   "int x, y;"
-  (cl:progn (cl:defvar y 0) (cl:defvar x 0)))
+  (cl:progn (cl:defparameter y 0) (cl:defparameter x 0)))
 
 (reader-test k&r-pg9
   "void main()
@@ -440,14 +440,21 @@ printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
 }
 "
   (vacietis::c-fun main () ((fahr 0))
-    (for ((= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
+    (for (() (= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
          (printf "%3d %6.1f
 "
                  fahr (* (/ 5.0 9.0) (- fahr 32))))))
 
-;; (reader-test c99-style-for-init
-;;   "for (int x = 0; x < 10; x++)
-;; x++;")
+(reader-test c99-style-for-init
+  "for (int x = 0; x < 10; x++)
+x++;"
+  (for (((x 0)) (cl:progn (cl:setf x 0)) (< x 10) (post++ x))
+    (post++ x)))
+
+(reader-test c99-style-for1
+  "for (int x = 0; x < 10; x++) foobar += x;"
+  (for (((x 0)) (cl:progn (cl:setf x 0)) (< x 10) (post++ x))
+    (+= foobar x)))
 
 (reader-test k&r-pg18
   "void main()
@@ -468,7 +475,7 @@ while (c != EOF) {
 
 (reader-test var-declare-and-initialize0
   "int x = 1;"
-  (cl:progn (cl:defvar x 1)))
+  (cl:progn (cl:defparameter x 1)))
 
 (reader-test modulo0
   "1 % 2;"

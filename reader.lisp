@@ -215,7 +215,9 @@
 
 (defun cstr (str) ;; for development
   (let ((*readtable* (find-readtable 'c-readtable)))
-    (read-from-string str)))
+    (with-input-from-string (s str)
+      (cons 'progn (loop with it do (setf it (read s nil))
+                         while it collect it)))))
 
 ;;; infix
 
@@ -278,6 +280,8 @@
 (defun next-exp ()
   (read-c-exp (next-char)))
 
+(defvar *variable-declarations*)
+
 (defun read-control-flow-statement (statement)
   (macrolet ((control-flow-case (statement &body cases)
                `(acase ,statement
@@ -294,10 +298,15 @@
                           (list (read-block-or-statement)))
        (vacietis.c:while  (parse-infix (next-exp))
                           (read-block-or-statement))
-       (vacietis.c:for    (let ((exp (c-read-delimited-list (next-char) #\;)))
-                            (if (= 3 (length exp))
-                                (mapcar #'parse-infix exp)
-                                (read-error "Malformed for expression: ~a" exp)))
+       (vacietis.c:for    (let* ((*variable-declarations* ())
+                                 (initializations (progn
+                                                    (next-char)
+                                                    (read-c-statement
+                                                     (next-char)))))
+                            (list* *variable-declarations*
+                                   initializations
+                                   (mapcar #'parse-infix
+                                           (c-read-delimited-list #\( #\;))))
                           (read-block-or-statement))))))
 
 (defun c-read-delimited-list (open-delimiter separator)
@@ -310,8 +319,6 @@
                     if (eql separator c) collect (gather-acc)
                     else do (push (read-c-exp c) acc))
               (awhen (gather-acc) (list it))))))
-
-(defvar *variable-declarations*)
 
 (defun read-function (name)
   `(vacietis::c-fun ,name
@@ -334,7 +341,7 @@
                     (progn (push (list name 0) *variable-declarations*)
                            (when initial-value
                              `((setf ,name ,initial-value))))
-                    `((defvar ,name ,(or initial-value 0))))))
+                    `((defparameter ,name ,(or initial-value 0))))))
             (read-decl (declared)
               (acase (next-char)
                 (#\; declared)
