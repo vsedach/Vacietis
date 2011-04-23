@@ -106,6 +106,7 @@
    #:mkptr&
    #:post--
    #:post++
+   #:[]
    ))
 
 (defpackage #:vacietis.reader

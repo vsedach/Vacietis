@@ -26,7 +26,7 @@
     + -
     * / %))
 
-(cl:defparameter vacietis.reader::*basic-c-types* '(int static void const signed unsigned short long float double char extern))
+(cl:defparameter vacietis.reader::*basic-c-types* '(int static void const signed unsigned short long float double char extern auto))
 
 (cl:in-package #:vacietis.reader)
 
@@ -253,7 +253,10 @@
               (t (case b
                    (vacietis.c:++ `(vacietis.c:post++ ,a))
                    (vacietis.c:-- `(vacietis.c:post-- ,a))
-                   (t  `(,a ,@(mapcar #'parse-infix b))))))))) ;; assume funcall for now
+                   (t (cond ((eq 'vacietis.c:[] (car b))
+                             `(vacietis.c:[] ,a ,(cadr b)))
+                            (t ;; assume funcall
+                             `(,a ,@(mapcar #'parse-infix b)))))))))))
 
 (defun parse-infix (args)
   (if (consp args)
@@ -329,32 +332,29 @@
              (body (read-c-block (next-char))))
         (cons *variable-declarations* body))))
 
-(defun declare-var (name)
-  (let ((preallocated-value (aif (when (eql #\[ (peek-char t %in))
-                                   (second (read-c-exp (next-char))))
-                                 `(vacietis::array-literal ,it)
-                                 0))
-        (initial-value (when (eql #\= (peek-char t %in))
-                         (next-char) ;; FIXME!!
-                         (prog1 (parse-infix (c-read-delimited-list #\; #\,))
-                           (c-unread-char #\;)))))
-    (if (boundp '*variable-declarations*)
-        (progn (push (list name preallocated-value) *variable-declarations*)
-               (when initial-value
-                 `((setf ,name ,initial-value))))
-        `((defparameter ,name ,(or initial-value preallocated-value))))))
-
-(defun read-decl (declared)
-  (acase (next-char)
-    (#\; declared)
-    (#\, (read-decl declared))
-    (#\[ (read-c-exp it) (read-decl declared))
-    (t   (read-decl (append (declare-var (read-c-exp it)) declared)))))
+(defun process-variable-declaration (spec)
+  (let (name (preallocated-value 0) initial-value)
+    (labels ((parse-declaration (spec)
+               (if (symbolp spec)
+                   (setf name spec)
+                   (progn (case (car spec)
+                            (vacietis.c:= (setf initial-value (third spec)))
+                            (vacietis.c:[] (awhen (third spec)
+                                             (setf preallocated-value
+                                                  `(vacietis::array-literal ,it)))))
+                          (parse-declaration (second spec))))))
+      (parse-declaration spec)
+      (if (boundp '*variable-declarations*)
+          (progn (push (list name preallocated-value) *variable-declarations*)
+                 (when initial-value `((vacietis.c:= ,name ,initial-value))))
+          `((defparameter ,name ,(or initial-value preallocated-value)))))))
 
 (defun read-variable-declaration (first-name)
-  (aif (read-decl (declare-var first-name))
-       (cons 'progn it)
-       t))
+  (let ((decls (c-read-delimited-list #\; #\,)))
+    (aif (mapcan (lambda (x) (process-variable-declaration (parse-infix x)))
+                 (cons (cons first-name (car decls)) (cdr decls)))
+         (cons 'progn it)
+         t)))
 
 (defun read-declaration (token)
   (when (c-type? token)
@@ -422,7 +422,7 @@
                ;;        (read-c-macro stream)))
                (#\" (read-c-string c))
                (#\( (c-read-delimited-list #\( #\,))
-               (#\[ (list 'aref
+               (#\[ (list 'vacietis.c:[]
                           (parse-infix (loop with c do (setf c (next-char))
                                           until (eql c #\])
                                           collect (read-c-exp c))))))))))

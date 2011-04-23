@@ -387,7 +387,7 @@ fahr = fahr + step;
 
 (reader-test multiple-declaration0
   "int x, y;"
-  (cl:progn (cl:defparameter y 0) (cl:defparameter x 0)))
+  (cl:progn (cl:defparameter x 0) (cl:defparameter y 0)))
 
 (reader-test k&r-pg9
   "void main()
@@ -445,12 +445,12 @@ printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
 (reader-test c99-style-for-init
   "for (int x = 0; x < 10; x++)
 x++;"
-  (for (((x 0)) (cl:progn (cl:setf x 0)) (< x 10) (post++ x))
+  (for (((x 0)) (cl:progn (= x 0)) (< x 10) (post++ x))
     (post++ x)))
 
 (reader-test c99-style-for1
   "for (int x = 0; x < 10; x++) foobar += x;"
-  (for (((x 0)) (cl:progn (cl:setf x 0)) (< x 10) (post++ x))
+  (for (((x 0)) (cl:progn (= x 0)) (< x 10) (post++ x))
     (+= foobar x)))
 
 (reader-test k&r-pg18
@@ -490,7 +490,7 @@ while (c != EOF) {
     return result;
 }"
   (vacietis::c-fun pow (base exponent) ((result 0))
-    (cl:progn (cl:setf result 1))
+    (cl:progn (= result 1))
     (while (> exponent 0)
       (if (% exponent 2) ((*= result base)))
       (*= base base)
@@ -545,10 +545,111 @@ while (c != EOF) {
   "int x = 1 + 2;"
   (cl:progn (cl:defparameter x (+ 1 2))))
 
-;; (reader-test h&s-declaration-multiple-initialization
-;;   "static short s;
-;; auto short *sp = &s + 3, *msp = &s - 3;"
-;;   )
+(reader-test declare-two-ints0
+  "int x, y;"
+  (cl:progn (cl:defparameter x 0)
+            (cl:defparameter y 0)))
+
+(reader-test declare-two-ints-initialize0
+  "int x = 1, y;"
+  (cl:progn (cl:defparameter x 1)
+            (cl:defparameter y 0)))
+
+(reader-test declare-two-ints-initialize1
+  "int x, y = 1;"
+  (cl:progn (cl:defparameter x 0)
+            (cl:defparameter y 1)))
+
+(reader-test declare-two-ints-initialize2
+  "int x = 1, y = 2;"
+  (cl:progn (cl:defparameter x 1)
+            (cl:defparameter y 2)))
+
+(reader-test declare-two-ints-initialize3
+  "int x = 1 + 2, y;"
+  (cl:progn (cl:defparameter x (+ 1 2))
+            (cl:defparameter y 0)))
+
+(reader-test declare-two-ints-initialize4
+  "int x, y = 1 + 2;"
+  (cl:progn (cl:defparameter x 0)
+            (cl:defparameter y (+ 1 2))))
+
+(reader-test declare-two-ints-initialize5
+  "int x = 1 + 2, y = 3 + 4;"
+  (cl:progn (cl:defparameter x (+ 1 2))
+            (cl:defparameter y (+ 3 4))))
+
+(reader-test declare-two-ints-initialize6
+  "int x = foo(), y;"
+  (cl:progn (cl:defparameter x (foo))
+            (cl:defparameter y 0)))
+
+(reader-test declare-two-ints-initialize7
+  "int x = foo(1 + 2), y;"
+  (cl:progn (cl:defparameter x (foo (+ 1 2)))
+            (cl:defparameter y 0)))
+
+(reader-test declare-two-ints-initialize8
+  "int x, y = foo(1 + 2);"
+  (cl:progn (cl:defparameter x 0)
+            (cl:defparameter y (foo (+ 1 2)))))
+
+(reader-test declare-two-ints-initialize9
+  "int x = 3 + 4, y = foo(1 + 2);"
+  (cl:progn (cl:defparameter x (+ 3 4))
+            (cl:defparameter y (foo (+ 1 2)))))
+
+(reader-test declare-two-ints-initialize10
+  "int x = bar(3 + 4), y = foo(1 + 2);"
+  (cl:progn (cl:defparameter x (bar (+ 3 4)))
+            (cl:defparameter y (foo (+ 1 2)))))
+
+(reader-test declare-deref0
+  "int *x[], *y[] = foo;"
+  (cl:progn (cl:defparameter x 0) (cl:defparameter y foo)))
+
+(reader-test declare-deref1
+  "int *x[], *y[] = 4;"
+  (cl:progn (cl:defparameter x 0) (cl:defparameter y 4)))
+
+(reader-test declare-deref2
+  "int *x[], *y = 4;"
+  (cl:progn (cl:defparameter x 0) (cl:defparameter y 4)))
+
+(reader-test declare-deref3
+  "int *x[], *y;"
+  (cl:progn (cl:defparameter x 0) (cl:defparameter y 0)))
+
+(reader-test declare-deref4
+  "int *x[], y;"
+  (cl:progn (cl:defparameter x 0) (cl:defparameter y 0)))
+
+(reader-test declare-deref5
+  "int x[], y;"
+  (cl:progn (cl:defparameter x 0) (cl:defparameter y 0)))
+
+(reader-test aref0
+  "x[5];"
+  ([] x 5))
+
+(reader-test aref1
+  "x[1 + 2];"
+  ([] x (+ 1 2)))
+
+(reader-test h&s-static-short
+  "static short s;"
+  (cl:progn (cl:defparameter s 0)))
+
+(reader-test h&s-declaration-multiple-initialization
+  "void main() {
+static short s;
+auto short *sp = &s + 3, *msp = &s - 3;
+}"
+  (vacietis::c-fun main () ((msp 0) (sp 0) (s 0))
+    (cl:progn
+      (= sp (+ (mkptr& s) 3))
+      (= msp (- (mkptr& s) 3)))))
 
 ;; (reader-test function-returning-pointer-to-int
 ;;   "int *foo();"
