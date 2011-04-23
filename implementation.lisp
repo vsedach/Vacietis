@@ -10,17 +10,6 @@
    `(defmacro ,c (,x)
       `(,',lisp ,,x))))
 
-;;; storage units
-
-;; (defmacro sizeof (x)
-;;   (cond ((basic-type? x) 1)
-;;         ((typedef? x) (typedef-size x))
-;;         (t (let ((var (gensym)))
-;;              `(let ((,var ,x))
-;;                 (if (vectorp ,var)
-;;                     (length ,var)
-;;                     1))))))
-
 ;;; binary arithmetic
 
 (defmacro define-binary-op-mapping-definer (name &body body)
@@ -45,13 +34,33 @@
 
 (def-unary-op vacietis.c:~ lognot)
 
-;;; pointers
+;;; pointers, storage units and allocation
 
 ;;; pointers are represented by conses (they never occur as C types)
 ;;; an array pointer is a cons (array . index)
 ;;; a place pointer is a cons (closure . nil)
 
 (defconstant vacietis.c:NULL 0)
+
+;; (defmacro sizeof (x)
+;;   (cond ((basic-type? x) 1)
+;;         ((typedef? x) (typedef-size x))
+;;         (t (let ((var (gensym)))
+;;              `(let ((,var ,x))
+;;                 (if (vectorp ,var)
+;;                     (length ,var)
+;;                     1))))))
+
+(defun string-to-char* (string)
+  (cons (let ((unicode (babel:string-to-octets string :encoding :utf-8)))
+          (adjust-array unicode (1+ (length unicode)) :initial-element 0))
+        0))
+
+(defun array-literal (&optional (size 0) literal) ;; single dimension
+  (cons (if literal
+            (adjust-array literal (max size (length literal)) :initial-element 0)
+            (make-array size :initial-element 0))
+        0))
 
 (defmacro vacietis.c:mkptr& (place) ;; need to deal w/function pointers
   (let ((new-value (gensym)))

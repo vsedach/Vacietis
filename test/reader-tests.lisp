@@ -21,19 +21,16 @@
 
 (reader-test string1
   "x = \"foo\";"
-  (= x "foo"))
+  (= x (vacietis::string-to-char* "foo")))
 
 (reader-test string2
   "b = \"foo\" \"bar\";"
-  (= b "foobar"))
-
-;; (reader-test unclosed-string
-;;   "\"foo")
+  (= b (vacietis::string-to-char* "foobar")))
 
 (reader-test string-escape1
   "_FOO = \"foo\\nbar\";"
-  (= _FOO "foo
-bar"))
+  (= _FOO (vacietis::string-to-char* "foo
+bar")))
 
 (reader-test identifier1
   "_foo;"
@@ -100,8 +97,8 @@ return a > b ? a : b;
 
 (reader-test function-call1
   "printf(\"hello, world\\n\");"
-  (printf "hello, world
-"))
+  (printf (vacietis::string-to-char* "hello, world
+")))
 
 (reader-test function-call2
   "check_gc_signals_unblocked_or_lose(0);"
@@ -385,7 +382,7 @@ fahr = fahr + step;
 }"
   (while (<= fahr upper)
     (= celsius (* 5 (/ (- fahr 32) 9)))
-    (printf "%dt%dn" fahr celsius)
+    (printf (vacietis::string-to-char* "%dt%dn") fahr celsius)
     (= fahr (+ fahr step))))
 
 (reader-test multiple-declaration0
@@ -399,8 +396,8 @@ printf(\"hello, world\\n\");
 }
 "
   (vacietis::c-fun main () ()
-    (printf "hello, world
-")))
+    (printf (vacietis::string-to-char* "hello, world
+"))))
 
 (reader-test k&r-pg12
   "void main()
@@ -428,7 +425,7 @@ fahr = fahr + step;
     (= fahr lower)
     (while (<= fahr upper)
       (= celsius (* 5 (/ (- fahr 32) 9)))
-      (printf "%dt%dn" fahr celsius)
+      (printf (vacietis::string-to-char* "%dt%dn") fahr celsius)
       (= fahr (+ fahr step)))))
 
 (reader-test k&r-pg16
@@ -441,8 +438,8 @@ printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
 "
   (vacietis::c-fun main () ((fahr 0))
     (for (() (= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
-         (printf "%3d %6.1f
-"
+         (printf (vacietis::string-to-char* "%3d %6.1f
+")
                  fahr (* (/ 5.0 9.0) (- fahr 32))))))
 
 (reader-test c99-style-for-init
@@ -519,3 +516,55 @@ while (c != EOF) {
 (reader-test just-return
   "return;"
   (return cl:nil))
+
+(reader-test array-of-ints0
+  "int foobar[];"
+  (cl:progn (cl:defparameter foobar 0)))
+
+(reader-test array-of-pointers-to-int0
+  "int *foobar[];"
+  (cl:progn (cl:defparameter foobar 0)))
+
+(reader-test array-of-pointers-to-int1
+  "int *foobar[5];"
+  (cl:progn (cl:defparameter foobar (vacietis::array-literal 5))))
+
+(reader-test array-of-ints1
+  "int foobar[5];"
+  (cl:progn (cl:defparameter foobar (vacietis::array-literal 5))))
+
+(reader-test pointer-to-int0
+  "int *x;"
+  (cl:progn (cl:defparameter x 0)))
+
+(reader-test char-literal0
+  "char foobar[] = \"Foobar\";"
+  (cl:progn (cl:defparameter foobar (vacietis::string-to-char* "Foobar"))))
+
+(reader-test declaration-initialization0
+  "int x = 1 + 2;"
+  (cl:progn (cl:defparameter x (+ 1 2))))
+
+;; (reader-test h&s-declaration-multiple-initialization
+;;   "static short s;
+;; auto short *sp = &s + 3, *msp = &s - 3;"
+;;   )
+
+;; (reader-test function-returning-pointer-to-int
+;;   "int *foo();"
+;;   nil)
+;; declaration, should be ignored?
+
+;; (reader-test array-of-array-of-ints
+;;   "int foobar[5][5];")
+
+;; (reader-test pointer-to-array-of-ints0
+;;   "int (*foobar)[];"
+;;   (cl:progn (cl:defparameter foobar 0)))
+
+;; (reader-test pointer-to-array-of-ints1
+;;   "int (*foobar)[5];"
+;;   (cl:progn (cl:defparameter foobar 0)))
+
+;; (reader-test unclosed-string
+;;   "\"foo")

@@ -11,4 +11,4 @@
    (:file "package")
    (:file "implementation")
    (:file "reader"))
-  :depends-on (:named-readtables :anaphora))
+  :depends-on (:named-readtables :anaphora :babel))

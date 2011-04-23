@@ -169,7 +169,7 @@
            (progn (setf c (next-char nil))
                   (unless (eql c #\")
                     (unless (eq c 'end) (c-unread-char c))
-                    (return string)))
+                    (return `(vacietis::string-to-char* (,string)))))
            (vector-push-extend (read-char-literal c) string)))))
 
 ;;; preprocessor
@@ -310,7 +310,7 @@
                           (read-block-or-statement))))))
 
 (defun c-read-delimited-list (open-delimiter separator)
-  (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\})))
+  (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\}) (#\; #\;)))
         (acc ()))
     (flet ((gather-acc ()
              (prog1 (reverse acc) (setf acc ()))))
@@ -329,29 +329,32 @@
              (body (read-c-block (next-char))))
         (cons *variable-declarations* body))))
 
+(defun declare-var (name)
+  (let ((preallocated-value (aif (when (eql #\[ (peek-char t %in))
+                                   (second (read-c-exp (next-char))))
+                                 `(vacietis::array-literal ,it)
+                                 0))
+        (initial-value (when (eql #\= (peek-char t %in))
+                         (next-char) ;; FIXME!!
+                         (prog1 (parse-infix (c-read-delimited-list #\; #\,))
+                           (c-unread-char #\;)))))
+    (if (boundp '*variable-declarations*)
+        (progn (push (list name preallocated-value) *variable-declarations*)
+               (when initial-value
+                 `((setf ,name ,initial-value))))
+        `((defparameter ,name ,(or initial-value preallocated-value))))))
+
+(defun read-decl (declared)
+  (acase (next-char)
+    (#\; declared)
+    (#\, (read-decl declared))
+    (#\[ (read-c-exp it) (read-decl declared))
+    (t   (read-decl (append (declare-var (read-c-exp it)) declared)))))
+
 (defun read-variable-declaration (first-name)
-  ;; have to deal with array declarations like *foo_bar[baz]
-  (let (vars-declared?)
-   (labels ((declare-var (name)
-              (setf vars-declared? t)
-              (let ((initial-value (when (eql #\= (peek-char t %in))
-                                     (next-char)
-                                     (read-c-exp (next-char)))))
-                (if (boundp '*variable-declarations*)
-                    (progn (push (list name 0) *variable-declarations*)
-                           (when initial-value
-                             `((setf ,name ,initial-value))))
-                    `((defparameter ,name ,(or initial-value 0))))))
-            (read-decl (declared)
-              (acase (next-char)
-                (#\; declared)
-                (#\, (read-decl declared))
-                (t   (read-decl (append (declare-var (read-c-exp it)) declared))))))
-     (let ((initializations (read-decl (declare-var first-name))))
-       (when vars-declared?
-         (if initializations
-             (cons 'progn initializations)
-             t))))))
+  (aif (read-decl (declare-var first-name))
+       (cons 'progn it)
+       t))
 
 (defun read-declaration (token)
   (when (c-type? token)

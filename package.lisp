@@ -4,7 +4,8 @@
   (:use #:cl #:named-readtables)
   (:export
    #:vacietis
-   #:c-readtable))
+   #:c-readtable
+   #:string-to-char*))
 
 (in-package #:vacietis)
 
