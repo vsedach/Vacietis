@@ -25,9 +25,9 @@
 
 (defmacro eval-test (name input result)
   `(test ,name ()
-     (is (equal ,result
-                (let ((*readtable* (find-readtable 'c-readtable)))
-                  (with-input-from-string (s ,input)
-                   (eval (cons 'progn
-                               (loop with it do (setf it (read s nil))
-                                  while it collect it)))))))))
+         (is (equalp ,result
+                     (let ((*readtable* (find-readtable 'c-readtable)))
+                       (with-input-from-string (s ,input)
+                         (eval (cons 'progn
+                                     (loop with it do (setf it (read s nil))
+                                        while it collect it)))))))))

@@ -629,6 +629,12 @@ while (c != EOF) {
   "int x[], y;"
   (cl:progn (cl:defparameter x 0) (cl:defparameter y 0)))
 
+(reader-test declare-two-chars-initialize0
+  "char source_pointer[] = \"foobar\", dest_pointer[7];"
+  (cl:progn
+    (cl:defparameter source_pointer (vacietis::string-to-char* "foobar"))
+    (cl:defparameter dest_pointer (vacietis::array-literal 7))))
+
 (reader-test aref0
   "x[5];"
   ([] x 5))

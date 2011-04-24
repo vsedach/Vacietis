@@ -1,7 +1,7 @@
 (in-package #:cl)
 
 (defpackage #:vacietis
-  (:use #:cl #:named-readtables)
+  (:use #:cl #:named-readtables #:anaphora)
   (:export
    #:vacietis
    #:c-readtable

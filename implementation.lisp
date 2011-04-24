@@ -159,31 +159,31 @@
 
 (unroll-assignment-ops += -= *= /= %= <<= >>= &= ^= |\|=|)
 
-(def-unary-op vacietis.c:++ incf)
-(def-unary-op vacietis.c:-- decf)
-
+(defmacro vacietis.c:++ (x)
+  `(vacietis.c:= ,x (vacietis.c:+ ,x 1)))
+(defmacro vacietis.c:-- (x)
+  `(vacietis.c:= ,x (vacietis.c:+ ,x 1)))
 (defmacro vacietis.c:post++ (x)
-  `(prog1 ,x (incf ,x)))
-
+  `(prog1 ,x (vacietis.c:++ ,x)))
 (defmacro vacietis.c:post-- (x)
-  `(prog1 ,x (decf ,x)))
+  `(prog1 ,x (vacietis.c:-- ,x)))
 
 ;;; iteration
 
 (defmacro vacietis.c:for ((bindings initialization test increment) &body body)
   `(let ,bindings
-     (tagbody ,initialization
+     (tagbody ,@(awhen initialization (list it))
       loop
         (when (eql 0 ,test)
           (go break))
         ,@body
       continue
-        ,increment
+        ,@(awhen increment (list it))
         (go loop)
       break)))
 
 (defmacro vacietis.c:while (test &body body)
-  `(vacietis.c:for (nil ,test nil) ,@body))
+  `(vacietis.c:for (nil nil ,test nil) ,@body))
 
 (defmacro vacietis.c:do (test &body body)
   `(tagbody loop

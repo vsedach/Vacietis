@@ -27,3 +27,14 @@ foobar;"
 for (int x = 0; x <= 10; x++) foobar += x;
 foobar;"
   55)
+
+(eval-test string-literal
+  "char foobar[] = \"foobar\";
+foobar;"
+  (string-to-char* "foobar"))
+
+(eval-test h&s-while-string-copy
+  "char source_pointer[] = \"foobar\", dest_pointer[7];
+while ( *dest_pointer++ = *source_pointer++ );
+dest_pointer - 7;"
+  (string-to-char* "foobar"))

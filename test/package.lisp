@@ -12,4 +12,5 @@
 
 (defpackage #:vacietis.test.basic
   (:use #:cl #:named-readtables #:eos)
-  (:import-from #:vacietis.test #:eval-test))
+  (:import-from #:vacietis.test #:eval-test)
+  (:import-from #:vacietis #:string-to-char*))
