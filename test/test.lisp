@@ -16,18 +16,12 @@
       (string= x y)
       (equal x y)))
 
-(defmacro reader-test (name input s-exp)
+(defmacro reader-test (name input &rest s-exps)
   `(test ,name ()
-     (is (case-sensitive-equalp
-          ',s-exp
-          (let ((*readtable* (find-readtable 'c-readtable)))
-            (read-from-string ,input))))))
+         (is (case-sensitive-equalp
+              '(progn ,@s-exps)
+              (vacietis.reader::cstr ,input)))))
 
 (defmacro eval-test (name input result)
   `(test ,name ()
-         (is (equalp ,result
-                     (let ((*readtable* (find-readtable 'c-readtable)))
-                       (with-input-from-string (s ,input)
-                         (eval (cons 'progn
-                                     (loop with it do (setf it (read s nil))
-                                        while it collect it)))))))))
+         (is (equalp ,result (eval (vacietis.reader::cstr ,input))))))

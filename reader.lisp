@@ -43,10 +43,11 @@
              (write-string (msg condition) stream))))
 
 (defun read-error (msg &rest args)
-  (error (make-condition 'c-reader-error
-                         :stream %in
-                         :msg (format nil "Error reading from C stream at line ~a: ~?"
-                                      *line-number* msg args))))
+  (error (make-condition
+          'c-reader-error
+          :stream %in
+          :msg (format nil "Error reading from C stream at line ~a: ~?"
+                       *line-number* msg args))))
 
 ;;; basic stream stuff
 
@@ -106,9 +107,10 @@
                  :radix 8))
 
 (defun read-hex ()
-  (parse-integer (slurp-while (lambda (c)
-                                (or (char<= #\0 c #\9) (char-not-greaterp #\A c #\F))))
-                 :radix 16))
+  (parse-integer
+   (slurp-while (lambda (c)
+                  (or (char<= #\0 c #\9) (char-not-greaterp #\A c #\F))))
+   :radix 16))
 
 (defun read-float (prefix separator)
   (let ((*readtable* (find-readtable :common-lisp)))
@@ -121,8 +123,10 @@
     (let ((value (digit-value c0)))
       (loop-reading
            (cond ((eq c 'end) (return value))
-                 ((char<= #\0 c #\9) (setf value (+ (* 10 value) (digit-value c))))
-                 ((or (char-equal c #\E) (char= c #\.)) (return (read-float value c)))
+                 ((char<= #\0 c #\9)
+                  (setf value (+ (* 10 value) (digit-value c))))
+                 ((or (char-equal c #\E) (char= c #\.))
+                  (return (read-float value c)))
                  (t (c-unread-char c) (return value)))))))
 
 (defun read-c-number (c)
@@ -174,57 +178,69 @@
 
 ;;; preprocessor
 
+(defvar *preprocessor-defines* (make-hash-table))
+
 (defvar *in-preprocessor-p* nil)
 (defvar *in-preprocessor-conditional-p* nil)
-(defvar *preprocessor-eval-p* t)
 
-(defun preprocessor-if-test (test-str)
-  (not (eql 0 (eval test-str)))) ;; HALP
-
-;; (defun read-c-macro (stream)
-;;   (let ((pp-directive (read stream t nil t)))
-;;     (case pp-directive
-;;       (include
-;;        (next-char stream)
-;;        (let ((delimiter (case (c-read-char stream)
-;;                           (#\" #\") (#\< #\>)
-;;                           (otherwise (read-error stream "Error reading include path: ~A" (c-read-line stream))))))
-;;          (let ((file (slurp-while stream (lambda (c) (char/= c delimiter)))))
-;;            (when *preprocessor-eval-p*
-;;              (c-read (c-file-stream file) t)))))
-;;       (if
-;;        (let* ((*in-preprocessor-conditional-p* t)
-;;               (test (c-read-line stream))
-;;               (*preprocessor-eval-p* (when *preprocessor-eval-p* (preprocessor-if-test test))))
-;;          (read-c-macro stream)))
-;;       (endif
-;;        (when (not *in-preprocessor-conditional-p*)
-;;          (read-error stream "Misplaced #endif")))
-;;       (otherwise
-;;        (read-error stream "Unknown preprocessor directive #~A" pp-directive)))))
+(defun read-c-macro (%in sharp)
+  (declare (ignore sharp))
+  ;; preprocessor directives need to be read in a separate namespace
+  (let ((pp-directive (read-c-identifier (next-char))))
+    (case pp-directive
+      (vacietis.c:define
+       (setf (gethash (read-c-identifier (next-char)) *preprocessor-defines*)
+             (c-read-line))
+       nil)
+      (vacietis.c:undef)
+      (vacietis.c:include
+       (next-char)
+       (let ((delimiter
+              (case (next-char)
+                (#\" #\") (#\< #\>)
+                (otherwise (read-error %in
+                                       "Error reading include path: ~A"
+                                       (c-read-line))))))
+         (let ((file (slurp-while (lambda (c) (char/= c delimiter)))))
+           (with-open-file (%in file)
+             (read-c-toplevel %in (next-char %in))))))
+      (vacietis.c:if
+       ;; (let* ((*in-preprocessor-conditional-p* t)
+       ;;        (test (c-read-line)))
+       ;;   (read-c-statement (next-char)))
+       )
+      (vacietis.c:ifdef)
+      (vacietis.c:ifndef)
+      (vacietis.c:else)
+      (vacietis.c:endif
+       (when (not *in-preprocessor-conditional-p*)
+         (read-error "Misplaced #endif")))
+      (vacietis.c:line)
+      (vacietis.c:elif)
+      (vacietis.c:pragma)
+      (vacietis.c:error)
+      (otherwise
+       (read-error "Unknown preprocessor directive #~A" pp-directive)))))
 
 ;;; reader
 
-;; (defun c-read (stream &optional recursive-p)
-;;   (let ((*readtable* (find-readtable 'c-readtable))
-;;         (*in-preprocessor-p* nil)
-;;         (*in-preprocessor-conditional-p* nil)
-;;         (*preprocessor-eval-p* t)
-;;         (c (next-char stream)))
-;;     (read stream )))
-
-(defun cstr (str) ;; for development
-  (let ((*readtable* (find-readtable 'c-readtable)))
+(defun cstr (str)
+  (let ((*readtable* (find-readtable 'c-readtable))
+        (*preprocessor-defines* (make-hash-table)))
     (with-input-from-string (s str)
-      (cons 'progn (loop with it do (setf it (read s nil))
-                         while it collect it)))))
+      (cons 'progn (loop with it do (setf it (read s nil 'eof))
+                         while (not (eq it 'eof)) collect it)))))
 
 ;;; infix
 
 (defun parse-nary (args)
   (flet ((split-recurse (x)
-           (list (elt args x) (parse-infix (subseq args 0 x)) (parse-infix (subseq args (1+ x))))))
-    (acond ((and (consp (car args)) (consp (caar args)) (some #'c-type? (caar args)))
+           (list (elt args x)
+                 (parse-infix (subseq args 0 x))
+                 (parse-infix (subseq args (1+ x))))))
+    (acond ((and (consp (car args))
+                 (consp (caar args))
+                 (some #'c-type? (caar args)))
             (parse-nary (cdr args))) ;; ignore casts
            ((position-if (lambda (x) (member x *assignment-ops*)) args)
             (split-recurse it))
@@ -232,13 +248,17 @@
             (let ((?pos it))
               (append (list 'vacietis.c:if (parse-infix (subseq args 0 ?pos)))
                       (aif (position 'vacietis.c:|:| args)
-                           (list (parse-infix (subseq args (1+ ?pos) it)) (parse-infix (subseq args (1+ it))))
-                           (read-error "Error parsing ?: trinary operator in: ~A" args)))))
-           ((loop for op in *binary-ops-table* thereis (position op args :start 1))
+                           (list (parse-infix (subseq args (1+ ?pos) it))
+                                 (parse-infix (subseq args (1+ it))))
+                           (read-error "Error parsing ?: trinary operator in: ~A"
+                                       args)))))
+           ((loop for op in *binary-ops-table*
+                  thereis (position op args :start 1))
             (split-recurse it))
            ((find (first args) *prefix-ops*)
             (if (= 3 (length args))
-                (parse-unary (first args) (parse-unary (second args) (third args)))
+                (parse-unary (first args)
+                             (parse-unary (second args) (third args)))
                 (read-error "Error parsing expression: ~A" args)))
            (t args)))) ;; assume arglist
 
@@ -384,42 +404,46 @@
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
-  (let* ((raw-name (concatenate 'string (string c) (slurp-while (lambda (c) (or (eql c #\_) (alphanumericp c))))))
+  (let* ((raw-name (concatenate
+                    'string (string c)
+                    (slurp-while (lambda (c)
+                                   (or (eql c #\_) (alphanumericp c))))))
          (raw-name-alphas (remove-if-not #'alpha-char-p raw-name))
-         (identifier-name (format nil (cond ((every #'upper-case-p raw-name-alphas) "~(~A~)")
-                                            ((every #'lower-case-p raw-name-alphas) "~:@(~A~)")
-                                            (t "~A"))
-                                  raw-name)))
+         (identifier-name
+          (format nil
+                  (cond ((every #'upper-case-p raw-name-alphas) "~(~A~)")
+                        ((every #'lower-case-p raw-name-alphas) "~:@(~A~)")
+                        (t "~A"))
+                  raw-name)))
     (or (find-symbol identifier-name '#:vacietis.c) (intern identifier-name))))
 
-
-
-;; this would be really simple if streams could unread more than one char
-;; also if CLISP didn't have bugs w/unread-char after peek and near EOF
 (defun match-longest-op (one)
-  (flet ((seq-matches (&rest chars)
+  (flet ((seq-match (&rest chars)
            (find (make-array (length chars)
                              :element-type 'character
                              :initial-contents chars)
                  *ops* :test #'string= :key #'symbol-name)))
-    (let* ((two       (c-read-char))
-           (two-match (seq-matches one two)))
-      (if two-match
-          (let ((three-match (seq-matches one two (peek-char nil %in))))
-            (if three-match
-                (progn (c-read-char) three-match)
-                two-match))
-          (progn (c-unread-char two)
-                 (seq-matches one))))))
+    (let ((one-match (seq-match one))
+          (two (c-read-char)))
+      (acond ((eq two 'end) one-match)
+             ((seq-match one two)
+              (let ((three-match (seq-match one two (peek-char nil %in))))
+                (if three-match
+                    (progn (c-read-char) three-match)
+                    it)))
+             (t (c-unread-char two) one-match)))))
 
 (defun read-c-exp (c)
   (or (match-longest-op c)
       (cond ((digit-char-p c) (read-c-number c))
-            ((or (eql c #\_) (alpha-char-p c)) (read-c-identifier c))
+            ((or (eql c #\_) (alpha-char-p c))
+             (let ((symbol (read-c-identifier c)))
+               (aif (gethash symbol *preprocessor-defines*)
+                    (with-input-from-string (%in it)
+                      (read-c-exp (next-char)))
+                    symbol)))
             (t
              (case c
-               ;; (#\# (let ((*in-preprocessor-p* t)) ;; preprocessor
-               ;;        (read-c-macro stream)))
                (#\" (read-c-string c))
                (#\( (c-read-delimited-list #\( #\,))
                (#\[ (list 'vacietis.c:[]
@@ -429,9 +453,8 @@
 
 ;;; readtable
 
-(defun read-c-toplevel (stream c)
-  (let ((%in stream)
-        (*line-number* 0))
+(defun read-c-toplevel (%in c)
+  (let ((*line-number* 0))
     (read-c-statement c)))
 
 (macrolet
@@ -440,16 +463,20 @@
          (:case :invert)
 
          ;; unary and prefix operators
-         ,@(loop for i in '(#\+ #\- #\~ #\! #\( #\& #\*) collect `(:macro-char ,i 'read-c-toplevel nil))
+         ,@(loop for i in '(#\+ #\- #\~ #\! #\( #\& #\*)
+              collect `(:macro-char ,i 'read-c-toplevel nil))
 
-;         (:macro-char #\# 'read-c-macro nil)
+         (:macro-char #\# 'read-c-macro nil)
 
          ;; numbers (should this be here?)
-         ,@(loop for i from 0 upto 9 collect `(:macro-char ,(digit-char i) 'read-c-toplevel nil))
+         ,@(loop for i from 0 upto 9
+              collect `(:macro-char ,(digit-char i) 'read-c-toplevel nil))
 
          ;; identifiers
          (:macro-char #\_ 'read-c-toplevel nil)
-         ,@(loop for i from (char-code #\a) upto (char-code #\z) collect `(:macro-char ,(code-char i) 'read-c-toplevel nil))
-         ,@(loop for i from (char-code #\A) upto (char-code #\Z) collect `(:macro-char ,(code-char i) 'read-c-toplevel nil))
+         ,@(loop for i from (char-code #\a) upto (char-code #\z)
+              collect `(:macro-char ,(code-char i) 'read-c-toplevel nil))
+         ,@(loop for i from (char-code #\A) upto (char-code #\Z)
+              collect `(:macro-char ,(code-char i) 'read-c-toplevel nil))
          )))
   (def-c-readtable))

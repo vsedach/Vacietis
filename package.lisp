@@ -98,6 +98,20 @@
    #:_Complex
    #:_Imaginary
 
+   ;; preprocessor
+   #:define
+   #:undef
+   #:include
+   #:if
+   #:ifdef
+   #:ifndef
+   #:else
+   #:endif
+   #:line
+   #:elif
+   #:pragma
+   #:error
+
    ;; stuff that should be in header files
    #:NULL
 

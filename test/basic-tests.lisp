@@ -38,3 +38,9 @@ foobar;"
 while ( *dest_pointer++ = *source_pointer++ );
 dest_pointer - 7;"
   (string-to-char* "foobar"))
+
+(eval-test define-foo
+  "#define FOO 1
+int x = FOO;
+x;"
+  1)
