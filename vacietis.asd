@@ -3,6 +3,7 @@
 (defsystem :vacietis
   :name "vacietis"
   :author "Vladimir Sedach <vsedach@gmail.com>"
+  :description "C to Common Lisp compiler"
   :licence "LLGPLv3"
   :serial t
   :components

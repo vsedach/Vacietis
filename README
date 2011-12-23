@@ -1,28 +1,48 @@
-Vacietis aims to be a C99 to Common Lisp compiler that produces
-efficient programs that easily interoperate with Lisp functions, and
-in addition to offer the introspection, debugging and type-safety
-features of Common Lisp to C programmers.
+Vacietis is a C to Common Lisp compiler inspired by the Zeta-C
+compiler for Lisp Machines
+(http://www.bitsavers.org/bits/TI/Explorer/zeta-c/) and TCC
+(http://bellard.org/tcc/).
 
-The initial Vacietis code base is an import of the Zeta-C C to
-Zetalisp compiler public domain sources released by Zeta-C's author,
-Scott Burson. The original public domain Zeta-C sources are available
-at http://www.bitsavers.org/bits/TI/Explorer/zeta-c/
+The goal of Vacietis is to enable loading and running C code in a
+Common Lisp application. To this effect Vacietis uses the host CL
+calling convention for C functions and the CL package system for
+function and variable names, in essence treating the host CL runtime
+as a virtual machine.
 
-However, Vacietis is licensed under the LLGPL (see the file LICENSE
-included with the distribution for details). This covers the public
-domain source code originally imported from Zeta-C - any changes to
-Vacietis must likewise be released under the terms of the LLGPL. For
-the purposes of assigning copyright, the Vacietis project has been
-copyrighted by its originator, Vladimir Sedach
-<vsedach@gmail.com>. Contributors can choose to keep or assign
-copyright on their contributions.
+Vacietis uses the memory model of Common Lisp as is, so sizeof of the
+primitive data types (char, int, float etc.) is all 1. This shouldn't
+be a problem for most C code, but some C programs claim to be portable
+while making assumptions that things can be cast into an array of
+chars to be manipulated. These programs won't work under Vacietis.
 
-Currently, the project doesn't compile on Common Lisp. A conservative
-estimate is that most of the Zeta-C code will need to be replaced,
-however the goal is to re-use as much as possible. When Vacietis
-starts working, we'll make an announcement and remove this
-notice. That might take a while, so don't expect to find Vacietis in
-Quicklisp anytime soon!
+Source code is available at https://github.com/vsedach/vacietis
+
+Portions of the Vacietis libc may be derived from Zeta-C.
+
+Vacietis is authored by Vladimir Sedach <vsedach@gmail.com>
 
 There is a Vacietis mailing list on the web:
 http://groups.google.com/group/vacietis
+
+Vacietis is licensed under the LLGPL (see the file LICENSE included
+with the distribution for details).
+
+TODO:
+* finish preprocessor
+* function definition
+* structs
+* enums
+* setjmp/longjmp
+* libc
+
+Things that work:
+* arithmetic
+* chars
+* loops
+* assignment
+* conditionals
+* pointers and pointer arithmetic
+
+Things that probably won't be supported:
+* trying to cast arrays of chars to other types (mmap)
+* any kind of GCC extension
