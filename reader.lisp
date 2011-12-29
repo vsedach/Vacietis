@@ -180,8 +180,41 @@
 
 (defvar *preprocessor-defines* (make-hash-table))
 
-(defvar *in-preprocessor-p* nil)
-(defvar *in-preprocessor-conditional-p* nil)
+(defvar preprocessor-if-stack ())
+
+(defmacro lookup-define ()
+  `(gethash (read-c-identifier (next-char)) *preprocessor-defines*))
+
+(defun starts-with? (str x)
+  (string= str x :end1 (min (length str) (length x))))
+
+(defun preprocessor-skip-branch ()
+  (let ((if-nest-depth 1))
+    (loop for line = (c-read-line) do
+         (cond ((starts-with? line "#if")
+                (incf if-nest-depth))
+               ((and (starts-with? line "#endif")
+                     (= 0 (decf if-nest-depth)))
+                (pop preprocessor-if-stack)
+                (return))
+               ((and (starts-with? line "#elif")
+                     (= 1 if-nest-depth))
+                (case (car preprocessor-if-stack)
+                  (if (when (preprocessor-test (c-read-line))
+                        (setf (car preprocessor-if-stack) 'elif)
+                        (return)))
+                  (elif nil)
+                  (else (read-error "Misplaced #elif"))))))))
+
+(defun preprocessor-test (line)
+  (let ((exp (with-input-from-string (%in line)
+               (read-infix-exp (read-c-exp (next-char))))))
+    (not (eql 0 (eval `(symbol-macrolet ,(let ((x))
+                                              (maphash (lambda (k v)
+                                                         (push (list k v) x))
+                                                       *preprocessor-defines*)
+                                              x)
+                         ,exp))))))
 
 (defun read-c-macro (%in sharp)
   (declare (ignore sharp))
@@ -189,11 +222,11 @@
   (let ((pp-directive (read-c-identifier (next-char))))
     (case pp-directive
       (vacietis.c:define
-       (setf (gethash (read-c-identifier (next-char)) *preprocessor-defines*)
-             (c-read-line))
-       nil)
-      (vacietis.c:undef)
-      (vacietis.c:include
+       (setf (lookup-define) (c-read-line)))
+      (vacietis.c:undef
+       (setf (lookup-define) nil)
+       (c-read-line))
+      (vacietis.c:include ;; fixme
        (next-char)
        (let ((delimiter
               (case (next-char)
@@ -205,31 +238,33 @@
            (with-open-file (%in file)
              (read-c-toplevel %in (next-char %in))))))
       (vacietis.c:if
-       ;; (let* ((*in-preprocessor-conditional-p* t)
-       ;;        (test (c-read-line)))
-       ;;   (read-c-statement (next-char)))
-       )
-      (vacietis.c:ifdef)
-      (vacietis.c:ifndef)
-      (vacietis.c:else)
+       (push 'if preprocessor-if-stack)
+       (unless (preprocessor-test (c-read-line))
+         (preprocessor-skip-branch)))
+      (vacietis.c:ifdef
+       (push 'if preprocessor-if-stack)
+       (unless (lookup-define)
+         (preprocessor-skip-branch)))
+      (vacietis.c:ifndef
+       (push 'if preprocessor-if-stack)
+       (when (lookup-define)
+         (preprocessor-skip-branch)))
+      (vacietis.c:else ;; skip this branch
+       (if preprocessor-if-stack
+           (progn (setf (car preprocessor-if-stack) 'else)
+                  (preprocessor-skip-branch))
+           (read-error "Misplaced #else")))
       (vacietis.c:endif
-       (when (not *in-preprocessor-conditional-p*)
-         (read-error "Misplaced #endif")))
-      (vacietis.c:line)
-      (vacietis.c:elif)
-      (vacietis.c:pragma)
-      (vacietis.c:error)
-      (otherwise
-       (read-error "Unknown preprocessor directive #~A" pp-directive)))))
-
-;;; reader
-
-(defun cstr (str)
-  (let ((*readtable* (find-readtable 'c-readtable))
-        (*preprocessor-defines* (make-hash-table)))
-    (with-input-from-string (s str)
-      (cons 'progn (loop with it do (setf it (read s nil 'eof))
-                         while (not (eq it 'eof)) collect it)))))
+       (if preprocessor-if-stack
+           (pop preprocessor-if-stack)
+           (read-error "Misplaced #endif")))
+      (vacietis.c:elif
+       (if preprocessor-if-stack
+           (preprocessor-skip-branch)
+           (read-error "Misplaced #elif")))
+      (otherwise ;; line, pragma, error ignored for now
+       (c-read-line))))
+  nil)
 
 ;;; infix
 
@@ -390,6 +425,12 @@
     (next-char)
     (values (read-c-statement (next-char)) token)))
 
+(defun read-infix-exp (next-token)
+  (parse-infix (cons next-token
+                     (loop with c do (setf c (next-char nil))
+                        until (or (eql c #\;) (eql c 'end))
+                        collect (read-c-exp c)))))
+
 (defun read-c-statement (c)
   (unless (eql #\; c)
    (let ((next-token (read-c-exp c)))
@@ -397,10 +438,7 @@
        (acond (label (values statement label))
               ((read-declaration next-token) (if (eq t it) (values) it))
               (t (or (read-control-flow-statement next-token)
-                     (parse-infix (cons next-token
-                                        (loop with c do (setf c (next-char))
-                                           until (eql c #\;)
-                                           collect (read-c-exp c)))))))))))
+                     (read-infix-exp next-token))))))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
@@ -439,8 +477,10 @@
             ((or (eql c #\_) (alpha-char-p c))
              (let ((symbol (read-c-identifier c)))
                (aif (gethash symbol *preprocessor-defines*)
-                    (with-input-from-string (%in it)
-                      (read-c-exp (next-char)))
+                    (progn (setf %in (make-concatenated-stream
+                                      (make-string-input-stream it)
+                                      %in))
+                           (read-c-exp (next-char)))
                     symbol)))
             (t
              (case c
@@ -480,3 +520,12 @@
               collect `(:macro-char ,(code-char i) 'read-c-toplevel nil))
          )))
   (def-c-readtable))
+
+;;; reader
+
+(defun cstr (str)
+  (let ((*readtable* (find-readtable 'c-readtable))
+        (*preprocessor-defines* (make-hash-table)))
+    (with-input-from-string (s str)
+      (cons 'progn (loop with it do (setf it (read s nil 'eof))
+                         while (not (eq it 'eof)) collect it)))))

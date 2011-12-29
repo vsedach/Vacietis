@@ -44,3 +44,39 @@ dest_pointer - 7;"
 int x = FOO;
 x;"
   1)
+
+(eval-test define-foo1
+  "#define foo 2
+int baz = foo * 2;
+baz;"
+  4)
+
+(eval-test define-foo2
+  "#define foo 1 + 4
+int baz = foo * 2;
+baz;"
+  9)
+
+(eval-test preprocessor-if-1
+  "#if 2 < 1
+int baz = 5;
+baz;
+#endif"
+  nil)
+
+(eval-test preprocessor-if-2
+  "int baz = 123;
+#if 2 >= 1
+baz = 456;
+#endif
+baz;"
+  456)
+
+(eval-test preprocessor-ifdef
+  "#define FOOMAX
+int baz = 1;
+#ifdef FOOMAX
+int baz = 2;
+#endif
+baz;"
+  2)
