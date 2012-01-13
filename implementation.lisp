@@ -40,7 +40,7 @@
 ;;; an array pointer is a cons (array . index)
 ;;; a place pointer is a cons (closure . nil)
 
-(defconstant vacietis.c:NULL 0)
+
 
 ;; (defmacro sizeof (x)
 ;;   (cond ((basic-type? x) 1)

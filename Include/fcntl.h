@@ -1,1 +1,0 @@
-/* I don't know what <fcntl.h> is, but SSCL includes it, so here it is.  The End. */
