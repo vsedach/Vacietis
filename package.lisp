@@ -17,6 +17,7 @@
 (in-readtable vacietis)
 
 (defpackage #:vacietis.c
+  (:use)
   (:export
    ;; operators
    #:=
