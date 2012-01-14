@@ -1,107 +1,3 @@
-; This file contains the portion of the ZETA-C runtime environment that's in Lisp.
-
-
-; ================================================================
-; Misc. conventions.
-
-(defmacro zclib>null-pointer () '(values nil 0))
-(defconst NUL 0)
-(defconst EOF -1)
-(defconst *SGTTYB-LENGTH* 5 "The sizeof the sgttyb structure (in sgtty.h).")
-
-(defmacro defun-exporting (name &rest stuff)
-  "Just like DEFUN, except that it also arranges that the symbol being DEFUNed is
-   exported from its package."
-  `(progn 'compile
-     (export ',name (symbol-package ',name))
-     (defun ,name . ,stuff)))
-
-(defmacro deff-exporting (name definition)
-  `(progn 'compile
-     (export ',name (symbol-package ',name))
-     (deff ,name ,definition)))
-
-
-; ================================================================
-; Terminal I/O.
-
-(defflavor unix-terminal-io-stream
-	   ((input-line nil)
-	    input-index
-	    (untyi-char nil)
-	    (cbreak-mode nil)
-	    (no-echo nil)
-	    actual-stream)
-	   (si:bidirectional-stream)
-  (:initable-instance-variables actual-stream)
-  (:gettable-instance-variables actual-stream)
-  (:settable-instance-variables cbreak-mode no-echo))
-
-(defmethod (unix-terminal-io-stream :after :init) (ignore)
-  (when (not (memq *rubout-handler-message*
-		   (send actual-stream :which-operations)))
-    (ferror "ACTUAL-STREAM must be an interactive terminal stream; ~A isn't"
-	    actual-stream)))
-
-(defmethod (unix-terminal-io-stream :tyi) (&optional (eof-option nil))
-  (cond (untyi-char
-	 (prog1 untyi-char (setq untyi-char nil)))
-	(cbreak-mode
-	 (let ((ch (send actual-stream :tyi)))
-	   (when (not no-echo) (send actual-stream :tyo ch))
-	   ch))
-	(t (when (or (null input-line)
-		     (> input-index (string-length input-line)))
-	     (nlet ((new-line eof-p end-char (readline actual-stream)))
-	       (setq input-line new-line)
-	       (setq input-index (if (and (zerop (string-length new-line))
-					  (or eof-p (eql end-char #\End)))
-				     -1 0))))
-	   (let ((ch (cond ((< input-index 0)
-			    eof-option)		; An END was typed.
-			   ((= input-index (string-length input-line))
-			    #\Return)
-			   (t (aref input-line input-index)))))
-	     (if (< input-index 0)
-		 (setq input-line nil)
-		 (incf input-index))
-	     ch))))
-
-(defmethod (unix-terminal-io-stream :untyi) (ch)
-  (setq untyi-char ch))
-
-(defmethod (unix-terminal-io-stream :clear-input) ()
-  (setq input-line nil)
-  (setq untyi-char nil)
-  (send actual-stream :clear-input))
-
-(defmethod (unix-terminal-io-stream :listen) ()
-  (or untyi-char
-      (and input-line (<= input-index (string-length input-line)))
-      (send actual-stream :listen)))
-
-(defmethod (unix-terminal-io-stream :wait-for-input-with-timeout) (timeout)
-  (if (send self :listen) t
-    (send actual-stream :wait-for-input-with-timeout timeout)
-    (send self :listen)))
-
-(defmethod (unix-terminal-io-stream :before :set-cbreak-mode) (on-p)
-  (when on-p
-    (setq input-line nil)))
-
-(defmethod (unix-terminal-io-stream :tyo) (ch)
-  (send actual-stream :tyo ch))
-
-(defmethod (unix-terminal-io-stream :string-out) (string &optional (start 0) end)
-  (send actual-stream :string-out string start end))
-
-(defmethod (unix-terminal-io-stream :line-out) (string &optional start end)
-  (send actual-stream :line-out string start end))
-
-(defmethod (unix-terminal-io-stream :force-output) ()
-  (send actual-stream :force-output))
-
-
 ; ================================================================
 ; Program startup (the "shell").
 
@@ -109,23 +5,8 @@
   "The default pathname for opening files in this process (corresponds to the Unix
    notion of a current directory).")
 
-(defconst *stdin-fd* 0)
-(defconst *stdout-fd* 1)
-(defconst *stderr-fd* 2)
-
-(defvar *file-descriptor-table*
-	(let ((fdt (make-array 10.)))
-	  (aset standard-input fdt *stdin-fd*)
-	  (aset standard-output fdt *stdout-fd*)
-	  (aset error-output fdt *stderr-fd*)
-	  fdt)
-  "An array associating FDs (integers) with streams.")
-
 (defvar *signal-table* (make-array 17.)
   "An array associating signal values with functions-or-NIL.")
-
-(defvar *terminal-stream* :unbound
-  "A stream to the user's terminal, used for opening //dev//tty.")
 
 (defun create-c-program (name)
   "Sets up a function called NAME -- in package GLOBAL: if possible, else in the
@@ -226,15 +107,6 @@
     (setf (aref *file-descriptor-table* 0) unix-terminal-io)
     (setf (aref *file-descriptor-table* 1) unix-terminal-io)
     (setf (aref *file-descriptor-table* 2) unix-terminal-io)))
-
-; Synonym streams are SOOOO WEIRD!
-(defun terminal-io-syn-stream-p (stream)
-  "Is STREAM a synonym stream for TERMINAL-IO?"
-  (and (symbolp stream)
-       (eq (%p-contents-as-locative (function-cell-location stream))
-	   #+Genera (locf terminal-io)
-	   #-Genera (inhibit-style-warnings (value-cell-location 'terminal-io)))))
-
 
 ; ================================================================
 ; File I/O.

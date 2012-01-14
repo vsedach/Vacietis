@@ -40,8 +40,6 @@
 ;;; an array pointer is a cons (array . index)
 ;;; a place pointer is a cons (closure . nil)
 
-
-
 ;; (defmacro sizeof (x)
 ;;   (cond ((basic-type? x) 1)
 ;;         ((typedef? x) (typedef-size x))
@@ -55,6 +53,9 @@
   (cons (let ((unicode (babel:string-to-octets string :encoding :utf-8)))
           (adjust-array unicode (1+ (length unicode)) :initial-element 0))
         0))
+
+(defun char*-to-string (char*)
+  (babel:octets-to-string char* :encoding :utf-8))
 
 (defun array-literal (&optional (size 0) literal) ;; single dimension
   (cons (if literal

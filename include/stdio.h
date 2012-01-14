@@ -1,31 +1,15 @@
-/*
- STDIO.H for ZETA-C: sets up the default I/O environment.
- Note this file does not have a package specification, as it will be
- read into (potentially) many different packages. */
+typedef T FILE;
 
-#define FILE		lispval
-#define NULL		((void *) 0)
-#define EOF		(-1)
+#define EOF -1
 
-#define BUFSIZ		512		/* There's nothing this actually corresponds to */
+/* these constants are important but here defined arbitrarily */
+#define FILENAME_MAX 1024
+#define FOPEN_MAX 99999
+#define BUFSIZ 512
 
-extern FILE *stdin, *stdout, *stderr;
-#lisp
-  ;; We don't want this file to "own" these
-  (zeta-c:zclib>initialize-file-pointer |stdin| 0)
-  (zeta-c:zclib>initialize-file-pointer |stdout| 1)
-  (zeta-c:zclib>initialize-file-pointer |stderr| 2)
-#endlisp
+#define getchar()   getc(stdin)
+#define getc(f)     fgetc(f)
+#define putc(c, f)  fputc(c, f)
+#define putchar(c)  putc(c, stdout)
+#define puts(str)   fputs(str, stdout)
 
-extern int getc();
-extern int putc(), putchar();
-
-#define getchar()		getc(stdin)
-
-extern FILE *fopen(), *freopen(), *fdopen();
-long ftell();
-char *gets(), *fgets();
-
-#define ZETA_C
-
-/* End of STDIO.H */
