@@ -28,12 +28,18 @@ Vacietis is licensed under the LLGPL (see the file LICENSE included
 with the distribution for details).
 
 TODO:
-* finish preprocessor
+* finish preprocessor (include, ifdef on defines)
 * function definition
 * structs
 * enums
-* setjmp/longjmp
-* libc
+* libc - stdio, binary streams
+* libc - ctype
+* libc - math
+* libc - signal
+* libc - stdlib
+* libc - string
+* libc - time
+* libc - setjmp
 
 Things that work:
 * arithmetic
