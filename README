@@ -32,7 +32,7 @@ TODO:
 * function definition
 * structs
 * enums
-* libc - stdio, binary streams
+* libc - stdio - binary streams, error codes
 * libc - ctype
 * libc - math
 * libc - signal
