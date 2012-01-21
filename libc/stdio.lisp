@@ -2,35 +2,26 @@
 
 (defconstant EOF -1)
 
-(defvar *fd-lock* (bt:make-recursive-lock))
+;;; FILEs/streams
 
-(defvar *fd-table* (make-hash-table))
-(defvar *tmp-files* (make-hash-table))
+(defclass FILE ()
+  ((stream   :initarg  :stream  :accessor fd-stream)
+   (feof     :initform 0        :accessor feof)
+   (ferror   :initform 0        :accessor ferror)
+   (tmp-file :initform nil      :accessor tmp-file)))
 
-(defmacro fd-stream (fd)
-  `(bt:with-lock-held (*fd-lock*)
-     (gethash ,fd *fd-table*)))
+(defvar stdin  (make-instance 'FILE :stream *standard-input*))
+(defvar stdout (make-instance 'FILE :stream *standard-output*))
+(defvar stderr (make-instance 'FILE :stream *error-output*))
 
-(defvar *next-fd* 3)
+(defun clearerr (fd)
+  (setf (feof fd)   0
+        (ferror fd) 0))
 
-(defun next-fd ()
-  (incf *next-fd*))
-
-(defconstant stdin  0)
-(defconstant stdout 1)
-(defconstant stderr 2)
-
-(setf (fd-stream stdin)  *standard-input*
-      (fd-stream stdout) *standard-output*
-      (fd-stream stderr) *error-output*)
+(defun perror (str)
+  (fprintf stderr "%s: %s\n" s "error message"))
 
 ;;; file operations
-
-(defun register-fd (stream &optional fd)
-  (bt:with-lock-held (*fd-lock*)
-    (let ((fd (or fd (next-fd))))
-      (setf (fd-stream fd) stream)
-      fd)))
 
 (defun open-stream (filename mode)
   (let* ((m (char*-to-string mode))
@@ -47,31 +38,26 @@
     (apply #'open (char*-to-string filename) opts)))
 
 (defun fopen (filename mode)
-  (handler-case (register-fd (open-stream filename mode))
-    (error () NULL)))
-
-(defun freopen (filename mode fd)
-  (handler-case (register-fd (open-stream filename mode) fd)
+  (handler-case (make-instance 'FILE :stream (open-stream filename mode))
     (error () NULL)))
 
 (defun fflush (fd)
-  (if (= fd NULL)
-      (loop for stream being the hash-value of *fd-table* do
-           (when (output-stream-p stream)
-             (finish-output stream)))
-      (finish-output (fd-stream fd)))
+  (unless (eql fd NULL)
+    (finish-output (fd-stream fd)))
   0)
 
 (defun fclose (fd)
-  (let (stream tmp-path)
-    (with-lock-held (*fd-lock*)
-      (setf stream (fd-stream fd)
-            tmp-path (gethash fd *tmp-files*))
-      (remhash fd *fd-table*)
-      (remhash fd *tmp-files*))
-    (close stream)
-    (when tmp-path (delete-file tmp-path))
-    0))
+  (close (fd-stream fd))
+  (when (tmp-file fd)
+    (delete-file (tmp-file fd))
+    (setf (tmp-file fd) nil))
+  0)
+
+(defun freopen (filename mode fd)
+  (handler-case (progn (fclose fd)
+                       (clearerr fd)
+                       (setf (fd-stream fd) (open-stream filename mode)))
+    (error () NULL)))
 
 (defun remove (filename)
   (handler-case (progn (delete-file (char*-to-string filename))
@@ -91,8 +77,7 @@
         (let ((fd (fopen (string-to-char* (namestring path))
                          (string-to-char* "w+")))) ;; should be wb+
           (unless (eql fd NULL)
-            (with-lock-held (*fd-lock*)
-              (setf (gethash fd *tmp-files*) path)))
+            (setf (tmp-file fd) path))
           ;; also need to make sure tmp files are deleted on exit
           ;; good idea to attach finalizers to the tmp files' streams too
           fd))))
@@ -104,8 +89,8 @@
        (progn (replace str newname :end1 (length newname))
               str))))
 
-(defun setvbuf (fd buf mode size)
-  (declare (ignore fd buf mode size))
+(defun setvbuf (fd# buf mode size)
+  (declare (ignore fd# buf mode size))
   0)
 
 ;;; character I/O
@@ -121,7 +106,7 @@
 
 (defun fgets-is-dumb (str n fd replace-newline?)
   (handler-case
-      (let ((stream = (fd-stream fd)))
+      (let ((stream (fd-stream fd)))
         (loop for i from 0 below (1- n)
               for x = (read-char stream)
               do (progn (setf (aref str i) (char-code x))
@@ -139,8 +124,7 @@
   (fgets-is-dumb str most-positive-fixnum stdin t))
 
 (defun fputs (str fd)
-  (handler-case (progn (write-string (char*-to-string str)
-                                     (fd-stream fd))
+  (handler-case (progn (write-string (char*-to-string str) (fd-stream fd))
                        0)
     (error () EOF)))
 
@@ -152,12 +136,51 @@
   0)
 
 (defun ungetc (c fd)
-  (handler-case (progn (unread-char (code-char c) fd)
+  (handler-case (progn (unread-char (code-char c) (fd-stream fd))
                        c)
     (error () EOF)))
 
 ;;; fread/fwrite
 
+(defun fread (array obj-size num-obj fd)
+  ;; todo
+  )
 
+(defun fwrite (array obj-size num-obj fd)
+  ;; todo
+  )
 
 ;;; file positioning
+
+(defconstant SEEK_SET 0)
+(defconstant SEEK_CUR 1)
+(defconstant SEEK_END 2)
+
+(defun fseek (fd offset origin) ;; dumbest function in stdio
+  (handler-case
+      (let ((stream (fd-stream fd)))
+        (file-position stream (case origin
+                                (0 offset)
+                                (1 (+ offset (file-position stream)))
+                                (2 (+ offset (file-length stream)))))
+        0)
+    (error () 1)))
+
+(defun ftell (fd)
+  (or (file-position (fd-stream fd)) -1))
+
+(defun rewind (fd)
+  (fseek fd 0 0)
+  (clearerr fd))
+
+(defun fgetpos (fd pos_ptr)
+  (let ((pos (file-position (fd-stream fd))))
+    (if pos
+        (progn (setf (deref* pos_ptr) pos) 0)
+        1)))
+
+(defun fsetpos (fd pos_ptr)
+  (handler-case (progn (if (file-position (fd-stream fd) (deref* pos_ptr))
+                           0
+                           1))
+    (error () 1)))
