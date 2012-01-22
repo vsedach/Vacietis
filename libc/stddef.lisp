@@ -1,4 +1,5 @@
 (in-package #:vacietis.stddef)
+(in-readtable vacietis)
 
 (defconstant NULL 0)
 

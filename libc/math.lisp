@@ -1,4 +1,5 @@
 (in-package #:vacietis.math)
+(in-readtable vacietis)
 
 (defconstant HUGE_VAL most-positive-double-float)
 

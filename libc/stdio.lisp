@@ -1,4 +1,5 @@
 (in-package #:vacietis.stdio)
+(in-readtable vacietis)
 
 (defconstant EOF -1)
 
