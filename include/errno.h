@@ -1,10 +1,4 @@
-/*
- ERRNO.H for ZETA-C: declarations for the error codes which are
- placed in the external variable 'errno'.
-
- Note this file does not have a package specification, as it will be
- read into (potentially) many different packages. */
-
+/* From ZetaC */
 
 #define   EPERM	1
 #define   ENOENT	2

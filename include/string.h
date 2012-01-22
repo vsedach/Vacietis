@@ -11,6 +11,6 @@ extern int strcmp(), strlen(), strcspn(), strncmp(), strpos();
 extern int strrpos(), strspn();
 extern void *memcpy(), *memmove(), *memset(), *memchr();
 extern int memcmp();
-extern lispval zclib$str2lisp (char *s);
+
 
 /* End of STRING.H */

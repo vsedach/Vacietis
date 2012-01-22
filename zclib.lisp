@@ -1063,12 +1063,7 @@
     (setf (aref array i) (aref array (1- i))))
   (setf (aref array index) val))
 
-(defun string-to-lisp (str-ptr)
-  "Converts a C character pointer STR to a Lisp string."
-  (let ((nulidx (char-array-search 0 str-ptr)))
-    (unless nulidx
-      (error "String or character array ~a is not null-terminated." str-ptr))
-    (zclib>substring str-ptr nulidx)))
+
 
 (defun char-array-search (char array &optional start end)
   (let ((start (or start 0))
@@ -1084,13 +1079,3 @@
     (dotimes (i length)
       (setf (aref newstr i) (code-char (aref str (+ i start)))))
     newstr))
-
-(defun string-to-C (str)
-  "Converts a Lisp string to a C character pointer (returned as two values)."
-  (declare (values array index))
-  (nlet ((length (string-length str))
-	 ((newstr (make-array (1+ length) :type art-8b))))
-    (dotimes (i length)
-      (setf (aref newstr i) (char-code (aref str i))))
-    (setf (aref newstr length) (char-code NUL))
-    (values newstr 0)))
