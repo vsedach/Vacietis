@@ -657,6 +657,11 @@ auto short *sp = &s + 3, *msp = &s - 3;
       (= sp (+ (mkptr& s) 3))
       (= msp (- (mkptr& s) 3)))))
 
+(reader-test preprocessor-define-template-noargs
+  "#define getchar()  getc(stdin)
+getchar();"
+  cl:nil (getc stdin))
+
 ;; (reader-test function-returning-pointer-to-int
 ;;   "int *foo();"
 ;;   nil)

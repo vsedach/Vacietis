@@ -51,7 +51,7 @@
 
 ;;; basic stream stuff
 
-(defvar *line-number* 0)
+(defvar *line-number* 1)
 
 (defun c-read-char ()
   (let ((c (read-char %in nil 'end)))
@@ -72,6 +72,14 @@
   `(loop with c do (setf c (c-read-char))
         ,@body))
 
+(defun slurp-while (predicate)
+  (let ((string-buffer (make-string-buffer)))
+    (loop-reading
+       while (and (not (eq c 'end)) (funcall predicate c))
+       do (vector-push-extend c string-buffer)
+       finally (unless (eq c 'end) (c-unread-char c)))
+    string-buffer))
+
 (defun next-char (&optional (eof-error? t))
   "Returns the next character, skipping over whitespace and comments"
   (loop-reading
@@ -91,14 +99,6 @@
 
 (defun make-string-buffer ()
   (make-array '(3) :adjustable t :fill-pointer 0 :element-type 'character))
-
-(defun slurp-while (predicate)
-  (let ((string-buffer (make-string-buffer)))
-    (loop-reading
-       while (and (not (eq c 'end)) (funcall predicate c))
-       do (vector-push-extend c string-buffer)
-       finally (unless (eq c 'end) (c-unread-char c)))
-    string-buffer))
 
 ;;; numbers
 
@@ -216,15 +216,53 @@
                                               x)
                          ,exp))))))
 
+(defun fill-in-template (args template subs)
+  (ppcre:regex-replace-all
+   (format nil "([^a-zA-Z])?(~{~a~^|~})([^a-zA-Z0-9])?" args)
+   template
+   (lambda (match r1 arg r2)
+     (declare (ignore match))
+     (format nil "~A~A~A"
+             (or r1 "")
+             (elt subs (position arg args :test #'string=))
+             (or r2 "")))
+   :simple-calls t))
+
+(defun c-read-delimited-strings (&optional skip-spaces?)
+  (next-char) ;; skip opening paren
+  (let ((paren-depth 0)
+        (acc ()))
+    (with-output-to-string (sink)
+      (loop with c do (setf c (c-read-char))
+            until (and (= paren-depth 0) (eql #\) c)) do
+            (case c
+              (#\Space (unless skip-spaces? (princ c sink)))
+              (#\( (incf paren-depth) (princ c sink))
+              (#\) (decf paren-depth) (princ c sink))
+              (#\, (push (get-output-stream-string sink) acc))
+              (otherwise (princ c sink)))
+            finally (let ((last (get-output-stream-string sink)))
+                      (unless (string= last "")
+                        (push last acc)))))
+    (reverse acc)))
+
 (defun read-c-macro (%in sharp)
   (declare (ignore sharp))
   ;; preprocessor directives need to be read in a separate namespace
   (let ((pp-directive (read-c-identifier (next-char))))
     (case pp-directive
       (vacietis.c:define
-       (setf (lookup-define) (c-read-line)))
+       (setf (lookup-define)
+             (if (eql #\( (peek-char t %in))
+                 (let ((args (c-read-delimited-strings t))
+                       (template (string-trim '(#\Space #\Tab) (c-read-line))))
+                   (lambda (substitutions)
+                     (if args
+                         (fill-in-template args template substitutions)
+                         template)))
+                 (c-read-line))))
       (vacietis.c:undef
-       (setf (lookup-define) nil)
+       (remhash (read-c-identifier (next-char)) *preprocessor-defines*)
        (c-read-line))
       (vacietis.c:include ;; fixme
        (next-char)
@@ -374,7 +412,8 @@
              (prog1 (reverse acc) (setf acc ()))))
       (append (loop with c do (setf c (next-char))
                     until (eql c close-delimiter)
-                    if (eql separator c) collect (gather-acc)
+                    if (eql separator c)
+                    collect (gather-acc)
                     else do (push (read-c-exp c) acc))
               (awhen (gather-acc) (list it))))))
 
@@ -477,9 +516,14 @@
             ((or (eql c #\_) (alpha-char-p c))
              (let ((symbol (read-c-identifier c)))
                (aif (gethash symbol *preprocessor-defines*)
-                    (progn (setf %in (make-concatenated-stream
-                                      (make-string-input-stream it)
-                                      %in))
+                    (progn (setf %in
+                                 (make-concatenated-stream
+                                  (make-string-input-stream
+                                   (etypecase it
+                                     (string it)
+                                     (function
+                                      (funcall it (c-read-delimited-strings)))))
+                                  %in))
                            (read-c-exp (next-char)))
                     symbol)))
             (t
@@ -525,7 +569,8 @@
 
 (defun cstr (str)
   (let ((*readtable* (find-readtable 'c-readtable))
-        (*preprocessor-defines* (make-hash-table)))
+        (*preprocessor-defines* (make-hash-table))
+        (*line-number* 1))
     (with-input-from-string (s str)
       (cons 'progn (loop with it do (setf it (read s nil 'eof))
                          while (not (eq it 'eof)) collect it)))))

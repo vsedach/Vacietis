@@ -80,3 +80,8 @@ int baz = 2;
 #endif
 baz;"
   2)
+
+(eval-test preprocessor-define-template
+  "#define foo(x, y) x+y
+foo(1,2);"
+  3)
