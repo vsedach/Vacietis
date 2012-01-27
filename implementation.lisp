@@ -59,7 +59,8 @@
 
 (defun array-literal (&optional (size 0) literal) ;; single dimension
   (cons (if literal
-            (adjust-array literal (max size (length literal)) :initial-element 0)
+            (adjust-array literal (max size (length literal))
+                          :adjustable t :initial-element 0)
             (make-array size :initial-element 0))
         0))
 

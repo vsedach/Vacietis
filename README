@@ -28,7 +28,7 @@ Vacietis is licensed under the LLGPL (see the file LICENSE included
 with the distribution for details).
 
 TODO:
-* finish preprocessor (include, ifdef on defines)
+* #include preprocessor directive
 * function definition
 * structs
 * enums
@@ -46,6 +46,7 @@ Things that work:
 * assignment
 * conditionals
 * pointers and pointer arithmetic
+* most of the preprocessor
 
 Things that probably won't be supported:
 * trying to cast arrays of chars to other types (mmap)
