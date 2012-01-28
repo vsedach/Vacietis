@@ -233,7 +233,7 @@
   (let ((paren-depth 0)
         (acc ()))
     (with-output-to-string (sink)
-      (loop with c do (setf c (c-read-char))
+      (loop for c = (c-read-char)
             until (and (= paren-depth 0) (eql #\) c)) do
             (case c
               (#\Space (unless skip-spaces? (princ c sink)))
@@ -363,7 +363,7 @@
 
 (defun read-c-block (c)
   (if (eql c #\{)
-      (loop with c do (setf c (next-char))
+      (loop for c = (next-char)
             until (eql c #\}) append (reverse
                                       (multiple-value-list
                                        (read-c-statement c))))
@@ -371,7 +371,8 @@
 
 (defun c-type? (identifier)
   ;; and also do checks for struct, union, enum and typedef types
-  (member identifier *basic-c-types*))
+  (or (member identifier *basic-c-types*)
+      (member identifier '(vacietis.c:struct))))
 
 (defun next-exp ()
   (read-c-exp (next-char)))
@@ -410,7 +411,7 @@
         (acc ()))
     (flet ((gather-acc ()
              (prog1 (reverse acc) (setf acc ()))))
-      (append (loop with c do (setf c (next-char))
+      (append (loop for c = (next-char)
                     until (eql c close-delimiter)
                     if (eql separator c)
                     collect (gather-acc)
@@ -450,14 +451,32 @@
          (cons 'progn it)
          t)))
 
+(defun read-struct-block (sc)
+  (if (eql sc #\{)
+      (loop for c = (next-char) until (eql c #\}) append
+           (loop for x = (read-c-exp c) then (next-exp)
+                 while (or (eql 'vacietis.c::* x) (c-type? x))
+                 finally (return (when x (list x)))))
+      (read-error "Expected opening brace '{' but found '~A'" sc)))
+
+(defun read-struct (name)
+  (let ((declaration `(vacietis::c-struct ,name
+                        ,@(read-struct-block (next-char))))
+        (vars (if (eql #\; (peek-char t %in))
+                  (progn (next-char) nil)
+                  (list (read-variable-declaration (next-exp))))))
+    (if vars
+        `(progn ,declaration ,@ vars)
+        declaration)))
+
 (defun read-declaration (token)
   (when (c-type? token)
     (let ((name (loop with x do (setf x (next-exp))
                       while (or (eql 'vacietis.c::* x) (c-type? x))
                       finally (return x)))) ;; throw away type info
-      (if (eql #\( (peek-char t %in))
-          (read-function name)
-          (read-variable-declaration name)))))
+      (cond ((eql #\( (peek-char t %in)) (read-function name))
+            ((eql token 'vacietis.c:struct) (read-struct name))
+            (t (read-variable-declaration name))))))
 
 (defun read-labeled-statement (token)
   (when (eql #\: (peek-char t %in))

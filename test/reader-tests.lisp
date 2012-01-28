@@ -662,6 +662,13 @@ auto short *sp = &s + 3, *msp = &s - 3;
 getchar();"
   cl:nil (getc stdin))
 
+(reader-test simple-struct1
+  "struct complex {
+double real;
+double imag;
+};"
+  (vacietis::c-struct complex real imag))
+
 ;; (reader-test function-returning-pointer-to-int
 ;;   "int *foo();"
 ;;   nil)

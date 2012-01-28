@@ -210,3 +210,6 @@
 (defmacro c-fun (name arglist vars &body body)
   `(defun ,name ,arglist
      (prog* ,vars ,@body)))
+
+(defmacro c-struct (name slots)
+  )
