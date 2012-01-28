@@ -5,7 +5,10 @@
   (:export
    #:vacietis
    #:c-readtable
-   #:string-to-char*))
+   #:string-to-char*
+   #:c-exit
+   #:*the-environment*
+   ))
 
 (in-package #:vacietis)
 

@@ -27,7 +27,7 @@
 (defun rand ()
   (random RAND_MAX))
 
-(defun srand (state)
+(defun srand (state) ;; FIXME
   (setf *random-state* state))
 
 ;;; numeric conversion
@@ -42,7 +42,7 @@
   (atoi str))
 
 (defun atof (str)
-  )
+  ) ;; FIXME
 
 (defun strtod (str end-ptr)
   (multiple-value-bind (number end)
@@ -60,9 +60,61 @@
 (defun strtold (a b)
   (strtod a b))
 
+(defun strtol (str end-ptr base)
+  (multiple-value-bind (number end)
+      ;; fixme for octals
+      (parse-integer (char*-to-string str) :radix base :junk-allowed t)
+    (if (numberp number)
+        (progn
+          (unless (eql end NULL)
+            (setf (deref* end-ptr) (vacietis.c:+ str end)))
+          number)
+        'error)))
+
+(defun strtoll (a b c)
+  (strtol a b c))
+
+(defun strtoul (a b c)
+  (strtol a b c))
+
+(defun strtoull (a b c)
+  (strtol a b c))
+
 ;;; program environment
 
+(defconstant EXIT_SUCCESS 0)
+(defconstant EXIT_FAILURE 1)
+
+(defun abort ()
+  (throw 'c-done EXIT_FAILURE))
+
+(defvar *exit-functions* ())
+
+(defun exit (status)
+  (dolist (f *exit-functions*)
+    (funcall f))
+  ;; close streams
+  ;; delete tmpfiles
+  (throw 'vacietis:c-done status))
+
+(defun atexit (f)
+  (push f *exit-functions*))
+
+(defun getenv (name)
+  (gethash name vacietis:*the-environment* NULL))
+
+(defun setenv (name value)
+  (setf (gethash name vacietis:*the-environment*) value))
+
+(defun system (command)
+  0)
+
 ;;; search and sort
+;;; get bsearch and qsort from a reference libc
 
-;;; string conversion
+;;; some math functions
 
+(defun labs (x)
+  (abs x))
+
+;; need structs for div/ldiv

@@ -100,3 +100,39 @@
   (:use #:cl #:vacietis)
   (:export
    #:strerror))
+
+(defpackage #:vacietis.stdlib
+  (:use #:cl #:vacietis)
+  (:export
+   #:malloc
+   #:calloc
+   #:realloc
+   #:free
+   #:RAND_MAX
+   #:rand
+   #:srand
+   #:atoi
+   #:atol
+   #:atoll
+   #:atof
+   #:strtod
+   #:strtof
+   #:strtol
+   #:strtoll
+   #:strtoul
+   #:strtoull
+   #:EXIT_SUCCESS
+   #:EXIT_FAILURE
+   #:abort
+   #:exit
+   #:atexit
+   #:getenv
+   #:setenv
+   #:system
+   #:abs
+   #:labs
+   #:bsearch
+   #:qsort
+   #:div
+   #:ldiv
+   ))
