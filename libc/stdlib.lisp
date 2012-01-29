@@ -6,7 +6,7 @@
 (defun malloc (size)
   (if (= size 0)
       NULL
-      (array-literal size)))
+      (allocate-memory size)))
 
 (defun calloc (count size)
   (malloc (* count size)))

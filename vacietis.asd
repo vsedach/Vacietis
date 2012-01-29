@@ -10,6 +10,8 @@
   ((:static-file "vacietis.asd")
    (:static-file "vacietis.test.asd")
    (:file "package")
+   (:file "compiler-data")
+   (:file "runtime-data")
    (:file "implementation")
    (:file "reader"))
   :depends-on (:named-readtables :anaphora :babel :cl-ppcre))

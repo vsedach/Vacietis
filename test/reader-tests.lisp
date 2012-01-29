@@ -21,16 +21,16 @@
 
 (reader-test string1
   "x = \"foo\";"
-  (= x (vacietis::string-to-char* "foo")))
+  (= x "foo"))
 
 (reader-test string2
   "b = \"foo\" \"bar\";"
-  (= b (vacietis::string-to-char* "foobar")))
+  (= b "foobar"))
 
 (reader-test string-escape1
   "_FOO = \"foo\\nbar\";"
-  (= _FOO (vacietis::string-to-char* "foo
-bar")))
+  (= _FOO "foo
+bar"))
 
 (reader-test identifier1
   "_foo;"
@@ -97,8 +97,8 @@ return a > b ? a : b;
 
 (reader-test function-call1
   "printf(\"hello, world\\n\");"
-  (printf (vacietis::string-to-char* "hello, world
-")))
+  (printf "hello, world
+"))
 
 (reader-test function-call2
   "check_gc_signals_unblocked_or_lose(0);"
@@ -337,12 +337,14 @@ baz: a + b;
     baz (+ a b)))
 
 (reader-test sizeof-something
-  "result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
+  "int lispobj[20];
+result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
                       UNBOXED_PAGE_FLAG);"
+  (cl:progn (cl:defparameter lispobj (vacietis::allocate-memory 20)))
   (= result
      (pa_alloc
       (ALIGNED_SIZE
-       (* (+ 1 words) (sizeof lispobj)))
+       (* (+ 1 words) 20))
       UNBOXED_PAGE_FLAG)))
 
 (reader-test deref-cast-shift
@@ -382,7 +384,7 @@ fahr = fahr + step;
 }"
   (while (<= fahr upper)
     (= celsius (* 5 (/ (- fahr 32) 9)))
-    (printf (vacietis::string-to-char* "%dt%dn") fahr celsius)
+    (printf "%dt%dn" fahr celsius)
     (= fahr (+ fahr step))))
 
 (reader-test multiple-declaration0
@@ -396,8 +398,8 @@ printf(\"hello, world\\n\");
 }
 "
   (vacietis::c-fun main () ()
-    (printf (vacietis::string-to-char* "hello, world
-"))))
+    (printf "hello, world
+")))
 
 (reader-test k&r-pg12
   "void main()
@@ -425,7 +427,7 @@ fahr = fahr + step;
     (= fahr lower)
     (while (<= fahr upper)
       (= celsius (* 5 (/ (- fahr 32) 9)))
-      (printf (vacietis::string-to-char* "%dt%dn") fahr celsius)
+      (printf "%dt%dn" fahr celsius)
       (= fahr (+ fahr step)))))
 
 (reader-test k&r-pg16
@@ -438,8 +440,8 @@ printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
 "
   (vacietis::c-fun main () ((fahr 0))
     (for (() (= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
-         (printf (vacietis::string-to-char* "%3d %6.1f
-")
+      (printf "%3d %6.1f
+"
                  fahr (* (/ 5.0 9.0) (- fahr 32))))))
 
 (reader-test c99-style-for-init
@@ -527,11 +529,11 @@ while (c != EOF) {
 
 (reader-test array-of-pointers-to-int1
   "int *foobar[5];"
-  (cl:progn (cl:defparameter foobar (vacietis::array-literal 5))))
+  (cl:progn (cl:defparameter foobar (vacietis::allocate-memory 5))))
 
 (reader-test array-of-ints1
   "int foobar[5];"
-  (cl:progn (cl:defparameter foobar (vacietis::array-literal 5))))
+  (cl:progn (cl:defparameter foobar (vacietis::allocate-memory 5))))
 
 (reader-test pointer-to-int0
   "int *x;"
@@ -539,7 +541,7 @@ while (c != EOF) {
 
 (reader-test char-literal0
   "char foobar[] = \"Foobar\";"
-  (cl:progn (cl:defparameter foobar (vacietis::string-to-char* "Foobar"))))
+  (cl:progn (cl:defparameter foobar "Foobar")))
 
 (reader-test declaration-initialization0
   "int x = 1 + 2;"
@@ -632,8 +634,8 @@ while (c != EOF) {
 (reader-test declare-two-chars-initialize0
   "char source_pointer[] = \"foobar\", dest_pointer[7];"
   (cl:progn
-    (cl:defparameter source_pointer (vacietis::string-to-char* "foobar"))
-    (cl:defparameter dest_pointer (vacietis::array-literal 7))))
+    (cl:defparameter source_pointer "foobar")
+    (cl:defparameter dest_pointer (vacietis::allocate-memory 7))))
 
 (reader-test aref0
   "x[5];"

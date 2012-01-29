@@ -34,53 +34,58 @@
 
 (def-unary-op vacietis.c:~ lognot)
 
+(defmacro sizeof (x)
+  (cond ((intersection x vacietis.reader::*basic-c-types*) 1)
+        ((typedef? x) (typedef-size x))
+        (t (let ((var (gensym)))
+             `(let ((,var ,x))
+                (if (vectorp ,var)
+                    (length ,var)
+                    1))))))
+
 ;;; pointers, storage units and allocation
 
-;;; pointers are represented by conses (they never occur as C types)
+;;; pointers are represented by conses (which never occur as C types)
 ;;; an array pointer is a cons (array . index)
 ;;; a place pointer is a cons (closure . nil)
 
-;; (defmacro sizeof (x)
-;;   (cond ((basic-type? x) 1)
-;;         ((typedef? x) (typedef-size x))
-;;         (t (let ((var (gensym)))
-;;              `(let ((,var ,x))
-;;                 (if (vectorp ,var)
-;;                     (length ,var)
-;;                     1))))))
+(defstruct memptr
+  mem
+  (ptr 0))
 
 (defun string-to-char* (string)
-  (cons (let ((unicode (babel:string-to-octets string :encoding :utf-8)))
-          (adjust-array unicode (1+ (length unicode)) :initial-element 0))
-        0))
+  (make-memptr
+   :mem (let ((unicode (babel:string-to-octets string :encoding :utf-8)))
+          (adjust-array unicode (1+ (length unicode)) :initial-element 0))))
 
 (defun char*-to-string (char*)
-  (babel:octets-to-string char* :encoding :utf-8))
+  (let ((mem (memptr-mem char*))
+        (start (memptr-ptr char*)))
+   (babel:octets-to-string mem :encoding :utf-8 :start start
+                           :end (position 0 mem :start start))))
 
-(defun array-literal (&optional (size 0) literal) ;; single dimension
-  (cons (if literal
-            (adjust-array literal (max size (length literal))
-                          :adjustable t :initial-element 0)
-            (make-array size :initial-element 0))
-        0))
+(defun allocate-memory (size)
+  (make-memptr :mem (make-array size :adjustable t :initial-element 0)))
+
+(defstruct place-ptr
+  closure)
 
 (defmacro vacietis.c:mkptr& (place) ;; need to deal w/function pointers
   (let ((new-value (gensym)))
-    `(cons (lambda (&optional ,new-value) ;; this assumes nil doesn't occur as a C value
-             (if ,new-value
-                 (setf ,place ,new-value)
-                 ,place))
-           nil)))
+    `(make-place-ptr :closure (lambda (&optional ,new-value)
+                                (if ,new-value
+                                    (setf ,place ,new-value)
+                                    ,place)))))
 
 (defun vacietis.c:deref* (ptr)
-  (if (cdr ptr)
-      (aref (car ptr) (cdr ptr))
-      (funcall (car ptr))))
+  (etypecase ptr
+    (memptr (aref (memptr-mem ptr) (memptr-ptr ptr)))
+    (place-ptr (funcall (place-ptr-closure ptr)))))
 
 (defun (setf vacietis.c:deref*) (new-value ptr)
-  (if (cdr ptr)
-      (setf (aref (car ptr) (cdr ptr)) new-value)
-      (funcall (car ptr) new-value)))
+  (etypecase ptr
+    (memptr (setf (aref (memptr-mem ptr) (memptr-ptr ptr)) new-value))
+    (plate-ptr (funcall (place-ptr-closure ptr) new-value))))
 
 ;;; arithmetic
 
@@ -91,22 +96,22 @@
 (defmethod vacietis.c:+ ((x number) (y number))
   (+ x y))
 
-(defmethod vacietis.c:+ ((ptr cons) (x integer))
-  (cons (car ptr) (+ x (cdr ptr))))
+(defmethod vacietis.c:+ ((ptr memptr) (x integer))
+  (make-memptr :mem (memptr-mem ptr) :ptr (+ x (memptr-ptr ptr))))
 
-(defmethod vacietis.c:+ ((x integer) (ptr cons))
-  (cons (car ptr) (+ x (cdr ptr))))
+(defmethod vacietis.c:+ ((x integer) (ptr memptr))
+  (vacietis.c:+ ptr x))
 
 (defmethod vacietis.c:- ((x number) (y number))
   (- x y))
 
-(defmethod vacietis.c:- ((ptr cons) (x integer))
-  (cons (car ptr) (- (cdr ptr) x)))
+(defmethod vacietis.c:- ((ptr memptr) (x integer))
+  (make-memptr :mem (memptr-mem ptr) :ptr (- (memptr-ptr ptr) x)))
 
 (defmethod vacietis.c:- ((ptr1 cons) (ptr2 cons))
-  (assert (eq (car ptr1) (car ptr2)) ()
+  (assert (eq (memptr-mem ptr1) (memptr-mem ptr2)) ()
           "Trying to subtract pointers from two different memory segments")
-  (cons (car ptr1) (- (cdr ptr1) (cdr ptr2))))
+  (make-memptr :mem (memptr-mem ptr1) :ptr (- (memptr-ptr ptr1) (memptr-ptr ptr2))))
 
 ;;; comparison operators
 
@@ -151,13 +156,16 @@
   `(setf ,lvalue ,rvalue))
 
 (defmacro unroll-assignment-ops (&rest ops)
-  `(progn ,@(loop for op in ops collect
-                 `(defmacro ,(find-symbol (symbol-name op) '#:vacietis.c) (lvalue rvalue)
-                    `(setf ,lvalue
-                           (,',(find-symbol (reverse (subseq (reverse (symbol-name op)) 1))
-                                            '#:vacietis.c)
-                               ,lvalue
-                               ,rvalue))))))
+  `(progn
+     ,@(loop for op in ops collect
+            `(defmacro ,(find-symbol (symbol-name op) '#:vacietis.c)
+                 (lvalue rvalue)
+               `(setf ,lvalue
+                      (,',(find-symbol
+                           (reverse (subseq (reverse (symbol-name op)) 1))
+                           '#:vacietis.c)
+                          ,lvalue
+                          ,rvalue))))))
 
 (unroll-assignment-ops += -= *= /= %= <<= >>= &= ^= |\|=|)
 
@@ -211,5 +219,14 @@
   `(defun ,name ,arglist
      (prog* ,vars ,@body)))
 
+;;; structs
+
 (defmacro c-struct (name slots)
   )
+
+;;; literals
+
+(defun literal (x)
+  (etypecase x
+    (string (string-to-char* x))
+    (array (cons x 0))))

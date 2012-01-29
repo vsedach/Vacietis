@@ -6,9 +6,12 @@
    #:vacietis
    #:c-readtable
    #:string-to-char*
-   #:c-exit
+   #:c-exit ;; catch/throw tag
    #:*the-environment*
-   ))
+   #:*basic-c-types*
+   #:*variable-types*
+   #:variable-info
+   #:literal))
 
 (in-package #:vacietis)
 

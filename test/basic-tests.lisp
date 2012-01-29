@@ -85,3 +85,41 @@ baz;"
   "#define foo(x, y) x+y
 foo(1,2);"
   3)
+
+(eval-test sizeof-static-array
+  "static char buf[10];
+sizeof buf;"
+  10)
+
+(eval-test sizeof-int
+  "int foo;
+sizeof foo;"
+  1)
+
+(eval-test sizeof-int1
+  "int foo1 = 120;
+sizeof foo1;"
+  1)
+
+(eval-test sizeof0
+  "char foobar;
+sizeof (foobar);"
+  1)
+
+(eval-test sizeof1
+  "long foobar;
+1 + sizeof (foobar);"
+  2)
+
+(eval-test sizeof2
+  "sizeof int;"
+  1)
+
+(eval-test sizeof3
+  "sizeof (int);"
+  1)
+
+;;; fixme: literals and '' single quoting
+;; (eval-test sizeof-literal
+;;   "sizeof('c');"
+;;   2)

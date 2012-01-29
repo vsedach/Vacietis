@@ -26,7 +26,8 @@
     + -
     * / %))
 
-(cl:defparameter vacietis.reader::*basic-c-types* '(int static void const signed unsigned short long float double char extern auto))
+(cl:defparameter vacietis.reader::*type-qualifiers*
+  '(static const signed unsigned extern auto))
 
 (cl:in-package #:vacietis.reader)
 
@@ -173,7 +174,7 @@
            (progn (setf c (next-char nil))
                   (unless (eql c #\")
                     (unless (eq c 'end) (c-unread-char c))
-                    (return `(vacietis::string-to-char* (,string)))))
+                    (return (literal string))))
            (vector-push-extend (read-char-literal c) string)))))
 
 ;;; preprocessor
@@ -343,6 +344,14 @@
          (t (case a
               (vacietis.c:* `(vacietis.c:deref* ,b))
               (vacietis.c:& `(vacietis.c:mkptr& ,b))
+              (vacietis.c:sizeof
+               (when (listp b) (setf b (car b)))
+               (when (listp b)
+                 (warn "Don't know how size things like ~A yet" b)
+                 (setf b (car b)))
+               (or (cond ((member b *basic-c-types*) 1)
+                         (t (variable-info b)))
+                   (read-error "Don't know sizeof ~A" b)))
               (t (case b
                    (vacietis.c:++ `(vacietis.c:post++ ,a))
                    (vacietis.c:-- `(vacietis.c:post-- ,a))
@@ -371,7 +380,8 @@
 
 (defun c-type? (identifier)
   ;; and also do checks for struct, union, enum and typedef types
-  (or (member identifier *basic-c-types*)
+  (or (member identifier *type-qualifiers*)
+      (member identifier *basic-c-types*)
       (member identifier '(vacietis.c:struct))))
 
 (defun next-exp ()
@@ -395,7 +405,9 @@
                           (list (read-block-or-statement)))
        (vacietis.c:while  (parse-infix (next-exp))
                           (read-block-or-statement))
-       (vacietis.c:for    (let* ((*variable-declarations* ())
+       (vacietis.c:for    (let* ((*variable-types* (cons (make-hash-table)
+                                                         *variable-types*))
+                                 (*variable-declarations* ())
                                  (initializations (progn
                                                     (next-char)
                                                     (read-c-statement
@@ -419,13 +431,14 @@
               (awhen (gather-acc) (list it))))))
 
 (defun read-function (name)
-  `(vacietis::c-fun ,name
-      ,(remove-if #'c-type? ;; do the right thing with type declarations
-                  (reduce #'append
-                          (c-read-delimited-list (next-char) #\,)))
-    ,@(let* ((*variable-declarations* ())
-             (body (read-c-block (next-char))))
-        (cons *variable-declarations* body))))
+  (let ((*variable-types* (cons (make-hash-table) *variable-types*)))
+   `(vacietis::c-fun ,name
+        ,(remove-if #'c-type? ;; do the right thing with type declarations
+                    (reduce #'append
+                            (c-read-delimited-list (next-char) #\,)))
+        ,@(let* ((*variable-declarations* ())
+                 (body (read-c-block (next-char))))
+                (cons *variable-declarations* body)))))
 
 (defun process-variable-declaration (spec)
   (let (name (preallocated-value 0) initial-value)
@@ -434,11 +447,17 @@
                    (setf name spec)
                    (progn (case (car spec)
                             (vacietis.c:= (setf initial-value (third spec)))
-                            (vacietis.c:[] (awhen (third spec)
-                                             (setf preallocated-value
-                                                  `(vacietis::array-literal ,it)))))
+                            (vacietis.c:[]
+                             (awhen (third spec)
+                               (setf preallocated-value
+                                     `(vacietis::allocate-memory ,it)))))
                           (parse-declaration (second spec))))))
       (parse-declaration spec)
+      (setf (gethash name (car *variable-types*))
+            (cond ((and (consp initial-value) (eql 'literal (car initial-value)))
+                   (length (second initial-value)))
+                  ((consp preallocated-value) (second preallocated-value))
+                  (t 1)))
       (if (boundp '*variable-declarations*)
           (progn (push (list name preallocated-value) *variable-declarations*)
                  (when initial-value `((vacietis.c:= ,name ,initial-value))))
@@ -455,7 +474,7 @@
   (if (eql sc #\{)
       (loop for c = (next-char) until (eql c #\}) append
            (loop for x = (read-c-exp c) then (next-exp)
-                 while (or (eql 'vacietis.c::* x) (c-type? x))
+                 while (or (eql 'vacietis.c:* x) (c-type? x))
                  finally (return (when x (list x)))))
       (read-error "Expected opening brace '{' but found '~A'" sc)))
 
@@ -472,7 +491,7 @@
 (defun read-declaration (token)
   (when (c-type? token)
     (let ((name (loop with x do (setf x (next-exp))
-                      while (or (eql 'vacietis.c::* x) (c-type? x))
+                      while (or (eql 'vacietis.c:* x) (c-type? x))
                       finally (return x)))) ;; throw away type info
       (cond ((eql #\( (peek-char t %in)) (read-function name))
             ((eql token 'vacietis.c:struct) (read-struct name))
@@ -486,17 +505,17 @@
 (defun read-infix-exp (next-token)
   (parse-infix (cons next-token
                      (loop with c do (setf c (next-char nil))
-                        until (or (eql c #\;) (eql c 'end))
-                        collect (read-c-exp c)))))
+                           until (or (eql c #\;) (eql c 'end))
+                           collect (read-c-exp c)))))
 
 (defun read-c-statement (c)
   (unless (eql #\; c)
-   (let ((next-token (read-c-exp c)))
-     (multiple-value-bind (statement label) (read-labeled-statement next-token)
+   (let ((nt (read-c-exp c)))
+     (multiple-value-bind (statement label) (read-labeled-statement nt)
        (acond (label (values statement label))
-              ((read-declaration next-token) (if (eq t it) (values) it))
-              (t (or (read-control-flow-statement next-token)
-                     (read-infix-exp next-token))))))))
+              ((read-declaration nt) (if (eq t it) (values) it))
+              (t (or (read-control-flow-statement nt)
+                     (read-infix-exp nt))))))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
