@@ -671,6 +671,16 @@ double imag;
 };"
   (vacietis::c-struct complex real imag))
 
+(reader-test simple-struct-decl
+  "struct complex { double real; double imag; } x, y;"
+  (cl:progn (vacietis::c-struct complex real imag)
+            (cl:progn (cl:defparameter x (vacietis::allocate-memory 2))
+                      (cl:defparameter y (vacietis::allocate-memory 2)))))
+
+(reader-test struct-forward-declaration
+  "struct cell;"
+  (vacietis::c-struct cell))
+
 ;; (reader-test function-returning-pointer-to-int
 ;;   "int *foo();"
 ;;   nil)

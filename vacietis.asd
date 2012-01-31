@@ -10,6 +10,7 @@
   ((:static-file "vacietis.asd")
    (:static-file "vacietis.test.asd")
    (:file "package")
+   (:file "types")
    (:file "compiler-data")
    (:file "runtime-data")
    (:file "implementation")

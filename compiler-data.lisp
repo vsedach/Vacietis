@@ -1,15 +1,9 @@
 (in-package #:vacietis)
 (in-readtable vacietis)
 
-(in-package #:vacietis.c)
-
-(cl:defparameter vacietis:*basic-c-types*
-  '(int void short long float double char))
-
-(cl:in-package #:vacietis)
-
 (defvar *c-structs* (make-hash-table))
 
+;; right now just used to hold sizes
 (defvar *variable-types* (list (make-hash-table)))
 
 (defun variable-info (name)

@@ -8,10 +8,13 @@
    #:string-to-char*
    #:c-exit ;; catch/throw tag
    #:*the-environment*
+   #:*c-structs*
    #:*basic-c-types*
+   #:*type-qualifiers*
    #:*variable-types*
    #:variable-info
-   #:literal))
+   #:literal
+   #:size-of))
 
 (in-package #:vacietis)
 
