@@ -30,11 +30,10 @@ with the distribution for details).
 TODO:
 * #include preprocessor directive
 * function definition
-* structs
 * enums
-* libc - stdio - binary streams, error codes
+* libc - stdio: printf/scanf, binary streams, error codes
 * libc - signal
-* libc - stdlib
+* libc - stdlib: div/ldiv
 * libc - string
 * libc - time
 * libc - setjmp
@@ -47,6 +46,7 @@ Things that work:
 * conditionals
 * pointers and pointer arithmetic
 * most of the preprocessor
+* structs
 
 Things that probably won't be supported:
 * trying to cast arrays of chars to other types (mmap)
