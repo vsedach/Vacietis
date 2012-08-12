@@ -628,10 +628,18 @@
 
 ;;; reader
 
-(defun cstr (str)
+(defun slurp-c-stream (stream)
   (let ((*readtable* (find-readtable 'c-readtable))
         (*preprocessor-defines* (make-hash-table))
         (*line-number* 1))
-    (with-input-from-string (s str)
-      (cons 'progn (loop for it = (read s nil 'eof)
-                         while (not (eq it 'eof)) collect it)))))
+    (cons 'progn (loop for it = (read stream nil 'eof)
+                       while (not (eq it 'eof)) collect it))))
+
+(defun cstr (str)
+  (with-input-from-string (s str)
+    (slurp-c-stream s)))
+
+(defun load-c-file (file)
+  (eval
+   (with-open-file (s file :direction :input)
+     (slurp-c-stream s))))

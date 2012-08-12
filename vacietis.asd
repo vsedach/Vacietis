@@ -17,4 +17,4 @@
              (:file "runtime-data")
              (:file "implementation")
              (:file "reader"))))
-  :depends-on (:named-readtables :anaphora :babel :cl-ppcre))
+  :depends-on (:named-readtables :anaphora :babel :cl-ppcre :cl-fad))

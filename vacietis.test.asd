@@ -9,5 +9,6 @@
             :components ((:file "package")
                          (:file "test")
                          (:file "reader-tests")
-                         (:file "basic-tests"))))
+                         (:file "basic-tests")
+                         (:file "program-tests"))))
   :depends-on (:vacietis :eos))
