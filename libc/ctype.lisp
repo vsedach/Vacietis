@@ -1,4 +1,5 @@
-(in-package #:vacieits.ctype)
+(in-package #:vacietis.ctype)
+(in-readtable vacietis:vacietis)
 
 (defmacro chartest (cname exp)
   `(defun ,cname (code)

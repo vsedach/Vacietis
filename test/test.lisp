@@ -1,6 +1,7 @@
 ;;; The contents of this file are released into the public domain.
 
 (in-package #:vacietis.test)
+(in-readtable vacietis)
 
 (def-suite vacietis-reader)
 (def-suite basic-tests)
@@ -30,7 +31,7 @@
   `(test ,name
      (is (equalp ,result (eval (vacietis.reader::cstr ,input))))))
 
-(defmacro program-test (name result)
+(defmacro program-test (name &key return-code input output)
   `(test ,name
      (let ((test-package (make-package
                           (gensym (format nil "VACIETIS.TEST.~A" ',name))
@@ -42,7 +43,16 @@
                  (merge-pathnames
                   (format nil "programs/~(~A~)/main.c" ',name)
                   (directory-namestring #.*compile-file-truename*))))
-              ;;(with-output-to-string (*standard-output*))
-              (is (equalp ,result
-                          (funcall (find-symbol "MAIN" test-package)))))
+              (let* ((test-output-stream (when ,output
+                                           (make-string-output-stream)))
+                     (result (run-c-program
+                              test-package
+                              :stdin (when ,input
+                                       (make-string-input-stream ,input))
+                              :stdout test-output-stream)))
+                (when ,return-code
+                  (is (equal ,return-code result)))
+                (when ,output
+                  (is (equal ,output (get-output-stream-string
+                                      test-output-stream))))))
          (delete-package test-package)))))

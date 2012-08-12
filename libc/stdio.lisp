@@ -144,10 +144,12 @@
 ;;; fread/fwrite
 
 (defun fread (array obj-size num-obj fd)
+  (error "FREAD NOT IMPLEMENTED YET")
   ;; todo
   )
 
 (defun fwrite (array obj-size num-obj fd)
+  (error "FWRITE NOT IMPLEMENTED YET")
   ;; todo
   )
 

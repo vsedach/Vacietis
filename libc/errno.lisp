@@ -1,4 +1,4 @@
 (in-package #:vacietis.errno)
+(named-readtables:in-readtable vacietis:vacietis)
 
-(defvar errno 0)
-
+(cl:defvar errno 0)

@@ -7,14 +7,16 @@
    #:c-readtable
    #:string-to-char*
    #:c-exit ;; catch/throw tag
-   #:*the-environment*
    #:*c-structs*
    #:*basic-c-types*
    #:*type-qualifiers*
    #:*variable-types*
    #:variable-info
    #:literal
-   #:size-of))
+   #:size-of
+   ;; runtime
+   #:run-c-program
+   #:*the-environment*))
 
 (in-package #:vacietis)
 

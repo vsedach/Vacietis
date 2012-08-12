@@ -27,7 +27,8 @@
 (defun rand ()
   (random RAND_MAX))
 
-(defun srand (state) ;; FIXME
+(defun srand (state) ;; todo
+  (error "FIGURE OUT WHAT TO DO W/RANDOM STATES")
   (setf *random-state* state))
 
 ;;; numeric conversion
@@ -42,7 +43,8 @@
   (atoi str))
 
 (defun atof (str)
-  ) ;; FIXME
+  (error "ATOF NOT IMPLEMENTED YET")
+  ) ;; todo
 
 (defun strtod (str end-ptr)
   (multiple-value-bind (number end)
@@ -86,7 +88,7 @@
 (defconstant EXIT_FAILURE 1)
 
 (defun abort ()
-  (throw 'c-done EXIT_FAILURE))
+  (throw 'c-exit EXIT_FAILURE))
 
 (defvar *exit-functions* ())
 
@@ -95,7 +97,7 @@
     (funcall f))
   ;; close streams
   ;; delete tmpfiles
-  (throw 'vacietis:c-done status))
+  (throw 'c-exit status))
 
 (defun atexit (f)
   (push f *exit-functions*))

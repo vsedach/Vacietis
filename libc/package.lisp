@@ -1,5 +1,5 @@
 (in-package #:vacietis)
-(in-readtable vacietis)
+(named-readtables:in-readtable vacietis:vacietis)
 
 (defpackage #:vacietis.math
   (:use #:cl #:vacietis #:named-readtables)
@@ -30,7 +30,7 @@
    #:modf))
 
 (defpackage #:vacietis.ctype
-  (:use #:cl)
+  (:use #:cl #:named-readtables)
   (:export
    #:isspace
    #:isalnum
@@ -50,8 +50,8 @@
   (:use)
   (:export #:errno))
 
-(defpackage #:vacieitis.stddef
-  (:use #:named-readtables #:vacietis)
+(defpackage #:vacietis.stddef
+  (:use #:named-readtables #:vacietis #:cl)
   (:export
    #:NULL
    #:offsetof))
@@ -97,12 +97,13 @@
    ))
 
 (defpackage #:vacietis.string
-  (:use #:cl #:vacietis)
+  (:use #:cl #:vacietis #:named-readtables)
   (:export
    #:strerror))
 
 (defpackage #:vacietis.stdlib
-  (:use #:cl #:vacietis)
+  (:use #:cl #:vacietis #:named-readtables)
+  (:shadow #:abort)
   (:export
    #:malloc
    #:calloc

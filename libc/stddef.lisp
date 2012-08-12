@@ -5,4 +5,6 @@
 
 (defmacro offsetof (struct_type field)
   ;; find offset of field in struct_type
+  ;; todo
+  (error "OFFSETOF NOT IMPLEMENTED YET")
   )
