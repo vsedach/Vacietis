@@ -9,10 +9,12 @@
   :components
   ((:static-file "vacietis.asd")
    (:static-file "vacietis.test.asd")
-   (:file "package")
-   (:file "types")
-   (:file "compiler-data")
-   (:file "runtime-data")
-   (:file "implementation")
-   (:file "reader"))
+   (:module :src
+            :components
+            ((:file "package")
+             (:file "types")
+             (:file "compiler-data")
+             (:file "runtime-data")
+             (:file "implementation")
+             (:file "reader"))))
   :depends-on (:named-readtables :anaphora :babel :cl-ppcre))
