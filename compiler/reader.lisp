@@ -31,6 +31,7 @@
 ;;; this makes things a lot less hairy
 
 (defvar %in)
+(defvar *current-file* nil)
 
 ;;; error reporting
 
@@ -263,16 +264,17 @@
        (remhash (read-c-identifier (next-char)) *preprocessor-defines*)
        (c-read-line))
       (vacietis.c:include ;; fixme
-       (next-char)
        (let ((delimiter
               (case (next-char)
                 (#\" #\") (#\< #\>)
-                (otherwise (read-error %in
-                                       "Error reading include path: ~A"
+                (otherwise (read-error "Error reading include path: ~A"
                                        (c-read-line))))))
-         (let ((file (slurp-while (lambda (c) (char/= c delimiter)))))
-           (with-open-file (%in file)
-             (read-c-toplevel %in (next-char %in))))))
+         (load-c-file (merge-pathnames
+                       (prog1 (slurp-while (lambda (c) (char/= c delimiter)))
+                         (next-char))
+                       (directory-namestring
+                        (or *load-truename* *compile-file-truename*)))
+                      *preprocessor-defines*)))
       (vacietis.c:if
        (push 'if preprocessor-if-stack)
        (unless (preprocessor-test (c-read-line))
@@ -599,8 +601,7 @@
 ;;; readtable
 
 (defun read-c-toplevel (%in c)
-  (let ((*line-number* 0))
-    (read-c-statement c)))
+  (read-c-statement c))
 
 (macrolet
     ((def-c-readtable ()
@@ -628,18 +629,21 @@
 
 ;;; reader
 
-(defun slurp-c-stream (stream)
-  (let ((*readtable* (find-readtable 'c-readtable))
-        (*preprocessor-defines* (make-hash-table))
+(defun do-with-c-compiler (thunk)
+  (let ((*readtable*  (find-readtable 'c-readtable))
         (*line-number* 1))
-    (cons 'progn (loop for it = (read stream nil 'eof)
-                       while (not (eq it 'eof)) collect it))))
+    (funcall thunk)))
 
 (defun cstr (str)
   (with-input-from-string (s str)
-    (slurp-c-stream s)))
+    (let ((*preprocessor-defines* (make-hash-table)))
+     (do-with-c-compiler
+         (lambda ()
+           (cons 'progn (loop for it = (read s nil 'eof)
+                           while (not (eq it 'eof)) collect it)))))))
 
-(defun load-c-file (file)
-  (eval
-   (with-open-file (s file :direction :input)
-     (slurp-c-stream s))))
+(defun load-c-file (file &optional (*preprocessor-defines* (make-hash-table)))
+  (do-with-c-compiler
+      (lambda ()
+        (let ((*current-file* file))
+          (load file)))))
