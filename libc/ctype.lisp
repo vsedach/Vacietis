@@ -1,4 +1,4 @@
-(in-package #:vacietis.ctype)
+(in-package #:vacietis.libc.ctype.h)
 (in-readtable vacietis:vacietis)
 
 (defmacro chartest (cname exp)

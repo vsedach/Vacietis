@@ -263,18 +263,23 @@
       (vacietis.c:undef
        (remhash (read-c-identifier (next-char)) *preprocessor-defines*)
        (c-read-line))
-      (vacietis.c:include ;; fixme
-       (let ((delimiter
-              (case (next-char)
-                (#\" #\") (#\< #\>)
-                (otherwise (read-error "Error reading include path: ~A"
-                                       (c-read-line))))))
-         (load-c-file (merge-pathnames
-                       (prog1 (slurp-while (lambda (c) (char/= c delimiter)))
-                         (next-char))
-                       (directory-namestring
-                        (or *load-truename* *compile-file-truename*)))
-                      *preprocessor-defines*)))
+      (vacietis.c:include
+       (let* ((delimiter
+               (case (next-char)
+                 (#\" #\") (#\< #\>)
+                 (otherwise (read-error "Error reading include path: ~A"
+                                        (c-read-line)))))
+              (include-file
+               (slurp-while (lambda (c) (char/= c delimiter)))))
+         (next-char)
+         (if (char= delimiter #\")
+             (load-c-file (merge-pathnames
+                           include-file
+                           (directory-namestring
+                            (or *load-truename* *compile-file-truename*)))
+                          *preprocessor-defines*)
+             (use-package (find-package (format nil "VACIETIS.LIBC.~:@(~A~)"
+                                                include-file))))))
       (vacietis.c:if
        (push 'if preprocessor-if-stack)
        (unless (preprocessor-test (c-read-line))

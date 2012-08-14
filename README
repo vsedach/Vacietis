@@ -28,25 +28,15 @@ Vacietis is licensed under the LLGPL (see the file LICENSE included
 with the distribution for details).
 
 TODO:
-* #include preprocessor directive
-* function definition
 * enums
-* libc - stdio: printf/scanf, binary streams, error codes
-* libc - signal
-* libc - stdlib: div/ldiv
-* libc - string
-* libc - time
-* libc - setjmp
-
-Things that work:
-* arithmetic
-* chars
-* loops
-* assignment
-* conditionals
-* pointers and pointer arithmetic
-* most of the preprocessor
-* structs
+* function pointers
+* libc stdio: printf/scanf, binary streams, error codes, fread/fwrite
+* libc stddef: offsetof
+* libc signal
+* libc stdlib: div/ldiv, srand, atof, strtod, strtol, exit cleanup
+* libc string
+* libc time
+* libc setjmp
 
 Things that probably won't be supported:
 * trying to cast arrays of chars to other types (mmap)

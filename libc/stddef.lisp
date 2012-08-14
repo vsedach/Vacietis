@@ -1,4 +1,4 @@
-(in-package #:vacietis.stddef)
+(in-package #:vacietis.libc.stddef.h)
 (in-readtable vacietis)
 
 (defconstant NULL 0)

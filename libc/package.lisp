@@ -1,7 +1,7 @@
 (in-package #:vacietis)
 (named-readtables:in-readtable vacietis:vacietis)
 
-(defpackage #:vacietis.math
+(defpackage #:vacietis.libc.math.h
   (:use #:cl #:vacietis #:named-readtables)
   (:import-from #:vacietis.c #:deref*)
   (:export
@@ -29,7 +29,7 @@
    #:frexp
    #:modf))
 
-(defpackage #:vacietis.ctype
+(defpackage #:vacietis.libc.ctype.h
   (:use #:cl #:named-readtables)
   (:export
    #:isspace
@@ -46,17 +46,17 @@
    #:toupper
    #:tolower))
 
-(defpackage #:vacietis.errno
+(defpackage #:vacietis.libc.errno.h
   (:use)
   (:export #:errno))
 
-(defpackage #:vacietis.stddef
+(defpackage #:vacietis.libc.stddef.h
   (:use #:named-readtables #:vacietis #:cl)
   (:export
    #:NULL
    #:offsetof))
 
-(defpackage #:vacietis.stdio
+(defpackage #:vacietis.libc.stdio.h
   (:use #:cl #:named-readtables #:vacietis)
   (:import-from #:vacietis.c #:deref*)
   (:shadow #:remove)
@@ -96,12 +96,12 @@
    #:fsetpos
    ))
 
-(defpackage #:vacietis.string
+(defpackage #:vacietis.libc.string.h
   (:use #:cl #:vacietis #:named-readtables)
   (:export
    #:strerror))
 
-(defpackage #:vacietis.stdlib
+(defpackage #:vacietis.libc.stdlib.h
   (:use #:cl #:vacietis #:named-readtables)
   (:shadow #:abort)
   (:export

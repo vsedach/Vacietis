@@ -1,4 +1,4 @@
-(in-package #:vacietis.stdlib)
+(in-package #:vacietis.libc.stdlib.h)
 (in-readtable vacietis)
 
 ;;; allocation

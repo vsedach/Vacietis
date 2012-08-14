@@ -7,3 +7,5 @@
 (program-test main-return-include :return-code 8)
 
 (program-test main-return-include1 :return-code 9)
+
+(program-test include-libc :return-code 64)

@@ -5,11 +5,11 @@
   :author "Vladimir Sedach <vsedach@gmail.com>"
   :description "C to Common Lisp compiler"
   :licence "LLGPLv3"
-  :serial t
   :components
   ((:static-file "vacietis.asd")
    (:static-file "vacietis.test.asd")
    (:module :compiler
+            :serial t
             :components
             ((:file "package")
              (:file "types")
@@ -17,6 +17,7 @@
              (:file "implementation")
              (:file "reader")))
    (:module :libc
+            :serial t
             :components
             ((:file "package")
              (:file "errno")

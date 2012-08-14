@@ -1,4 +1,4 @@
-(in-package #:vacietis.stdio)
+(in-package #:vacietis.libc.stdio.h)
 (in-readtable vacietis)
 
 (defconstant EOF -1)
