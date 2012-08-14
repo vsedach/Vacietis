@@ -646,96 +646,6 @@
 		  (prog1 (si:xr-read-flonum temp-string nil)
 			 (si:return-read-string temp-string)))))
 
-(defun-exporting c:|fabs| (val)
-  "Floating-point absolute value."
-  (abs val))
-
-(defun-exporting c:|floor| (x)
-  "Returns the largest integer not greater than X."
-  (float (floor x)))
-
-(defun-exporting c:|ceil| (x)
-  "Returns the smallest integer not less than X."
-  (float (ceiling x)))
-
-(defun-exporting c:|exp| (x)
-  "The exponential function, base e."
-  (exp x))
-
-(defun-exporting c:|log| (x)
-  "The logarithm, base e."
-  (log x))
-
-(defun-exporting c:|log10| (x)
-  "The logarithm, base 10."
-  (// (log x) '#,(log 10)))	  ; Want constant folding!
-
-(defun-exporting c:|pow| (x y)
-  "X to the Y power."
-  (^ x y))
-
-(defun-exporting c:|sqrt| (x)
-  "Square root."
-  (sqrt x))
-
-(deff-exporting c:|sin| 'sin)
-
-(deff-exporting c:|cos| 'cos)
-
-(deff-exporting c:|tan| 'tan)
-
-(deff-exporting c:|atan| 'atan2)
-
-(deff-exporting c:|atan2| 'atan2)
-
-(defun-exporting c:|asin| (x)
-  "Arc-sine."
-  (atan2 x (sqrt (- 1 (* x x)))))
-
-(defun-exporting c:|acos| (x)
-  "Arc-cosine."
-  (atan2 (sqrt (- 1 (* x x))) x))
-
-#+Symbolics
-(deff-exporting c:|sinh| 'sinh)
-
-#+TI
-(deff-exporting c:|sinh| 'sinh)
-
-;; CADR and Lambda don't seem to have this
-#+MIT
-(defun-exporting c:|sinh| (x)
-  (let ((exp+x (exp x)))
-    (* .5 (- exp+x (// 1.0 exp+x)))))
-
-#+Symbolics
-(deff-exporting c:|cosh| 'cosh)
-
-#+TI
-(deff-exporting c:|cosh| 'cosh)
-
-#+MIT
-(defun-exporting c:|cosh| (x)
-  (let ((exp+x (exp x)))
-    (* .5 (+ exp+x (// 1.0 exp+x)))))
-
-#+Symbolics
-(deff-exporting c:|tanh| 'tanh)
-
-#+TI
-(deff-exporting c:|tanh| 'tanh)
-
-#+MIT
-(defun-exporting c:|tanh| (x)
-  (let ((exp2x (exp (* 2.0 x))))
-    (// (- exp2x 1.0) (+ exp2x 1.0))))
-
-; This isn't quite satisfactory, because it can get intermediate overflows
-; even though the result is in range.
-(defun-exporting c:|hypot| (x y)
-  (sqrt (+ (* x x) (* y y))))
-
-
 ; ================================================================
 ; Miscellaneous.
 
@@ -743,21 +653,6 @@
   "Nonlocal exit.  See SETJMP."
   (#+Symbolics throw #-Symbolics *throw jmp_buf
    (values (if (eql val 0) 1 val) jmp_buf)))
-
-(defun-exporting c:|exit| (status)
-  "Exits the program immediately.  If STATUS is nonzero, offers to enter the
-   debugger.  (This works by signalling 'SYS:ABORT.)"
-  (and (not (zerop status))
-       (y-or-n-p
-	 (format nil "Exiting with error code = ~D.~@
-		      Enter the debugger (No means abort instead)? "
-		 status))
-       (ferror "Exiting with error code = ~D." status))
-  (signal 'sys:abort #-Symbolics ""))
-
-(defun-exporting c:|abort| ()
-  (ferror "ABORT called"))
-
 
 ; ================================================================
 ; Memory allocation.

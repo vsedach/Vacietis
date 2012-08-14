@@ -6,17 +6,24 @@
    #:vacietis
    #:c-readtable
    #:string-to-char*
-   #:c-exit ;; catch/throw tag
    #:*c-structs*
    #:*basic-c-types*
    #:*type-qualifiers*
    #:*variable-types*
    #:variable-info
    #:literal
+
+   ;; memory stuff
    #:size-of
+   #:allocate-memory
+   #:memptr-mem
+   #:memptr-ptr
+
    ;; runtime
    #:run-c-program
-   #:*the-environment*))
+   #:c-exit ;; catch/throw tag
+   #:*environment*
+   ))
 
 (in-package #:vacietis)
 

@@ -187,3 +187,16 @@
                            0
                            1))
     (error () 1)))
+
+;;; printf
+
+(defun printf (fmt &rest args)
+  (apply #'fprintf stdout fmt args))
+
+(defun vprintf (stream fmt &rest args)
+  )
+
+(defun sprintf (string fmt &rest args))
+
+(defun snprintf (string max-length fmt &rest args))
+

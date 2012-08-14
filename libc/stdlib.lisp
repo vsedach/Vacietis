@@ -12,13 +12,18 @@
   (malloc (* count size)))
 
 (defun realloc (memory size)
-  (cond ((eql memory NULL) (malloc size))
-        ((= size 0) (setf (car memory) 'FREED_BY_REALLOC) memory)
-        (t (adjust-array (car memory) size :initial-element 0) memory)))
+  (cond ((eql memory NULL)
+         (malloc size))
+        ((= size 0)
+         (free memory)
+         NULL)
+        (t
+         (adjust-array (memptr-mem memory) size :initial-element 0)
+         memory)))
 
 (defun free (memory)
   (unless (eql NULL memory)
-    (setf (car memory) 'FREED_BY_FREE)))
+    (setf (memptr-mem memory) 'FREED_BY_FREE)))
 
 ;;; random numbers
 
@@ -103,10 +108,10 @@
   (push f *exit-functions*))
 
 (defun getenv (name)
-  (gethash name vacietis:*the-environment* NULL))
+  (gethash name vacietis:*environment* NULL))
 
 (defun setenv (name value)
-  (setf (gethash name vacietis:*the-environment*) value))
+  (setf (gethash name vacietis:*environment*) value))
 
 (defun system (command)
   0)

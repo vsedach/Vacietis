@@ -45,10 +45,6 @@
 
 ;;; pointers, storage units and allocation
 
-;;; pointers are represented by conses (which never occur as C types)
-;;; an array pointer is a cons (array . index)
-;;; a place pointer is a cons (closure . nil)
-
 (defstruct memptr
   mem
   (ptr 0))
@@ -59,9 +55,11 @@
           (adjust-array unicode (1+ (length unicode)) :initial-element 0))))
 
 (defun char*-to-string (char*)
-  (let ((mem (memptr-mem char*))
+  (let ((mem   (memptr-mem char*))
         (start (memptr-ptr char*)))
-   (babel:octets-to-string mem :encoding :utf-8 :start start
+   (babel:octets-to-string mem
+                           :encoding :utf-8
+                           :start start
                            :end (position 0 mem :start start))))
 
 (defun allocate-memory (size)
@@ -79,12 +77,12 @@
 
 (defun vacietis.c:deref* (ptr)
   (etypecase ptr
-    (memptr (aref (memptr-mem ptr) (memptr-ptr ptr)))
+    (memptr    (aref (memptr-mem ptr) (memptr-ptr ptr)))
     (place-ptr (funcall (place-ptr-closure ptr)))))
 
 (defun (setf vacietis.c:deref*) (new-value ptr)
   (etypecase ptr
-    (memptr (setf (aref (memptr-mem ptr) (memptr-ptr ptr)) new-value))
+    (memptr    (setf (aref (memptr-mem ptr) (memptr-ptr ptr)) new-value))
     (plate-ptr (funcall (place-ptr-closure ptr) new-value))))
 
 ;;; arithmetic
