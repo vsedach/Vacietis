@@ -48,18 +48,30 @@
   (atoi str))
 
 (defun atof (str)
-  (error "ATOF NOT IMPLEMENTED YET")
-  ) ;; todo
+  (let* ((str   (char*-to-string str))
+         (start (position-if (lambda (c)
+                               (not (find c '(#\Space #\Tab #\Newline))))
+                             str)))
+    (read-from-string
+     str
+     :start start
+     :end   (position-if (lambda (c)
+                           (not (find c ".0123456789+-eE")))
+                         str
+                         :start start))))
 
 (defun strtod (str end-ptr)
   (multiple-value-bind (number end)
       (read-from-string (char*-to-string str))
     (if (numberp number)
         (progn
-          (unless (eql end NULL)
+          (unless (eql end-ptr NULL)
             (setf (deref* end-ptr) (vacietis.c:+ str end)))
           number)
-        'error))) ;; fixme
+        (progn
+          (setf (deref* end-ptr) str
+                errno            ERANGE)
+          0))))
 
 (defun strtof (a b)
   (strtod a b))
@@ -70,13 +82,20 @@
 (defun strtol (str end-ptr base)
   (multiple-value-bind (number end)
       ;; fixme for octals
-      (parse-integer (char*-to-string str) :radix base :junk-allowed t)
-    (if (numberp number)
+      (parse-integer (char*-to-string str)
+                     :radix (if (= base 0)
+                                10 ;; should be auto
+                                base)
+                     :junk-allowed t)
+    (if (integerp number)
         (progn
-          (unless (eql end NULL)
+          (unless (eql end-ptr NULL)
             (setf (deref* end-ptr) (vacietis.c:+ str end)))
           number)
-        'error)))
+        (progn
+          (setf (deref* end-ptr) str
+                errno            ERANGE)
+          0))))
 
 (defun strtoll (a b c)
   (strtol a b c))

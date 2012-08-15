@@ -102,7 +102,7 @@
    #:strerror))
 
 (defpackage #:vacietis.libc.stdlib.h
-  (:use #:cl #:vacietis #:named-readtables)
+  (:use #:cl #:vacietis #:named-readtables #:vacietis.libc.errno.h)
   (:shadow #:abort)
   (:export
    #:malloc

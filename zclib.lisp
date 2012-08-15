@@ -8,25 +8,6 @@
 (defvar *signal-table* (make-array 17.)
   "An array associating signal values with functions-or-NIL.")
 
-(defun create-c-program (name)
-  "Sets up a function called NAME -- in package GLOBAL: if possible, else in the
-   name: package -- which is to be used as the top-level invocation function for
-   a C program.  The created function takes one required argument, which is the
-   current directory in which the program is to be run, followed by an &rest
-   argument of strings, which are the /"command line arguments/".  It initializes
-   externals, binds stdin etc. to the appropriate streams, packages up the
-   /"command line arguments/" into ARGC and ARGV in the standard Unix way, and
-   calls NAME:MAIN."
-  (create-c-package name)
-  (let ((name (intern (string name) name)))
-    (unless (catch-error (globalize name) nil)
-      (format error-output "~%Unable to globalize ~S~&" name))
-    (eval `(defun ,name (default-pathname &rest args)
-	     (zclib>run-program ',name default-pathname args)))
-    (comment (load "ZETA-C: Include; stdio" :package name
-		   :set-default-pathname nil))
-    name))
-
 (defmacro zclib>with-c-io (default-pathname &body body)
   "Executes BODY with the C runtime I/O environment set up.  DEFAULT-PATHNAME
    is the initial default pathname (/"current working directory/")."
@@ -70,20 +51,6 @@
 	  (t
 	   (zclib>with-c-io default-pathname
 	     (funcall main (1+ (length args)) argv.ary 0))))))
-
-(defun zclib>initialize-program (name)
-  "Initializes external and static variables in the package NAME."
-  (nlet ((pkg #+Symbolics (pkg-find-package name :find)
-	      #-Symbolics (find-package name))
-	 ((vars (cdr (assq pkg *package-variable-initialization-alist*)))))
-    (format error-output "~&Initializing externals ...")
-    (mapc #'(lambda (var)
-	      (let ((init-exp (get var 'value-initializer)))
-		(when init-exp (set var (eval init-exp))))
-	      (let ((func-init (get var 'function-initializer)))
-		(when func-init (funcall func-init 'initializing))))
-	  vars)
-    (format error-output " done.~%")))
 
 (defun zclib>close-all-files (&optional abort-p)
   "Closes all files opened by a C program.  If ABORT-P is non-NIL, the
@@ -593,76 +560,12 @@
 
 
 ; ================================================================
-; Arithmetic.
-
-(defun-exporting c:|abs| (val)
-  "Integer absolute value."
-  (abs val))
-
-(defun-exporting c:|atoi| (str.ar str.idx)
-  "Converts a string to an int.  Recognizes an optional string of tabs and spaces,
-   then an optional sign, then a string of digits.  The first unrecognized character
-   ends the string."
-  (while (memq (aref str.ar str.idx) '(#\Space #\Tab))
-    (incf str.idx))
-  (zclib>read-decimal-from-string str.ar str.idx))
-
-(defun-exporting c:|atol| (str.ar str.idx)
-  "Converts a string to a long.  Recognizes an optional string of tabs and spaces,
-   then an optional sign, then a string of digits.  The first unrecognized character
-   ends the string."
-  (c:|atoi| str.ar str.idx))
-
-(defun-exporting c:|atof| (str.ar str.idx)
-  "Converts a string to a floating-point number.  Recognizes an optional string of
-   tabs and spaces, then an optional sign, then a string of digits optionally
-   containing a decimal point, then an optional 'e' or 'E' followed by an
-   optionally signed integer.  The first unrecognized character ends the string."
-  ;; All we do is scan the string to find the end, then call SI:XR-READ-FLONUM,
-  ;; which has a hairy optimized algorithm for floating-point conversion.
-  (while (memq (code-char (aref str.ar str.idx)) '(#\Space #\Tab))
-    (incf str.idx))
-  (let ((numstart str.idx))
-    (when (memq (code-char (aref str.ar str.idx)) '(#\+ #\-))
-      (incf str.idx))
-    (while (or (digit-char-p (code-char (aref str.ar str.idx)))
-	       (char= (code-char (aref str.ar str.idx)) #\.))
-      (incf str.idx))
-    (when (memq (code-char (aref str.ar str.idx)) '(#\e #\E)) (incf str.idx))
-    (when (memq (code-char (aref str.ar str.idx)) '(#\+ #\-)) (incf str.idx))
-    (while (digit-char-p (code-char (aref str.ar str.idx)))
-      (incf str.idx))
-    #+Symbolics (let ((len (- str.idx numstart)))
-		  (sys:with-stack-array (temp-string len :type art-string)
-		    (dotimes (i len)
-		      (aset (code-char (aref str.ar (+ numstart i)))
-			    temp-string i))
-		    (si:xr-read-flonum temp-string nil)))
-    #-Symbolics (let ((temp-string (si:get-read-string))
-		      (len (- str.idx numstart)))
-		  (dotimes (i len)
-		    (aset (aref str.ar (+ numstart i)) temp-string i))
-		  (setf (fill-pointer temp-string) len)
-		  (prog1 (si:xr-read-flonum temp-string nil)
-			 (si:return-read-string temp-string)))))
-
-; ================================================================
 ; Miscellaneous.
 
 (defun-exporting c:|longjmp| (jmp_buf val)
   "Nonlocal exit.  See SETJMP."
   (#+Symbolics throw #-Symbolics *throw jmp_buf
    (values (if (eql val 0) 1 val) jmp_buf)))
-
-; ================================================================
-; Memory allocation.
-
-(defun-exporting c:|free| (object.ar object.idx)
-  "Someday this may try to return allocated objects to a freelist.  For the
-   moment, though, it does nothing."
-  (ignore object.ar object.idx)
-  (zclib>null-pointer))
-
 
 ; ================================================================
 ; Internal functions of various sorts.
