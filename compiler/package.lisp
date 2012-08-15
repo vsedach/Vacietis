@@ -19,10 +19,11 @@
    #:memptr-mem
    #:memptr-ptr
 
+   ;; utilities
+   #:char*-to-string
+
    ;; runtime
    #:run-c-program
-   #:c-exit ;; catch/throw tag
-   #:*environment*
    ))
 
 (in-package #:vacietis)
@@ -130,9 +131,6 @@
    #:elif
    #:pragma
    #:error
-
-   ;; stuff that should be in header files
-   #:NULL
 
    ;; stuff we define
    #:deref*

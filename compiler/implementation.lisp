@@ -83,7 +83,7 @@
 (defun (setf vacietis.c:deref*) (new-value ptr)
   (etypecase ptr
     (memptr    (setf (aref (memptr-mem ptr) (memptr-ptr ptr)) new-value))
-    (plate-ptr (funcall (place-ptr-closure ptr) new-value))))
+    (place-ptr (funcall (place-ptr-closure ptr) new-value))))
 
 ;;; arithmetic
 
@@ -114,9 +114,9 @@
 ;;; comparison operators
 
 (define-binary-op-mapping-definer define-comparison-ops
-  `(progn (defmethod ,op ((x cons) (y cons))
-            (if (and (eql (car x) (car y))
-                     (,cl (cdr x) (cdr y)))
+  `(progn (defmethod ,op ((x memptr) (y memptr))
+            (if (and (eq  (memptr-mem x) (memptr-mem y))
+                     (,cl (memptr-ptr x) (memptr-ptr y)))
                 1
                 0))
           (defmethod ,op ((x number) (y number))
@@ -130,6 +130,7 @@
   >= >=)
 
 (defmethod vacietis.c:== (x y)
+  (declare (ignore x y))
   0)
 
 ;;; boolean algebra
@@ -227,4 +228,4 @@
 (defun literal (x)
   (etypecase x
     (string (string-to-char* x))
-    (array (cons x 0))))
+    (array  (make-memptr :mem x))))

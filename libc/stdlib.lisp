@@ -112,7 +112,7 @@
 (defconstant EXIT_FAILURE 1)
 
 (defun abort ()
-  (throw 'c-exit EXIT_FAILURE))
+  (throw 'vacietis::c-exit EXIT_FAILURE))
 
 (defvar *exit-functions* ())
 
@@ -121,16 +121,16 @@
     (funcall f))
   ;; close streams
   ;; delete tmpfiles
-  (throw 'c-exit status))
+  (throw 'vacietis::c-exit status))
 
 (defun atexit (f)
   (push f *exit-functions*))
 
 (defun getenv (name)
-  (gethash name vacietis:*environment* NULL))
+  (gethash name vacietis::*environment* NULL))
 
 (defun setenv (name value)
-  (setf (gethash name vacietis:*environment*) value))
+  (setf (gethash name vacietis::*environment*) value))
 
 (defun system (command)
   0)

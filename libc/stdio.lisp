@@ -20,7 +20,7 @@
         (ferror fd) 0))
 
 (defun perror (str)
-  (fprintf stderr "%s: %s\n" s "error message"))
+  (fprintf stderr "%s: %s\n" str "error message"))
 
 ;;; file operations
 
@@ -193,10 +193,17 @@
 (defun printf (fmt &rest args)
   (apply #'fprintf stdout fmt args))
 
-(defun vprintf (stream fmt &rest args)
+(defun fprintf (fd fmt &rest args)
   )
 
-(defun sprintf (string fmt &rest args))
+(defun sprintf (str fmt &rest args)
+  (replace
+   (memptr-mem str)
+   (memptr-mem
+    (string-to-char*
+     (with-output-to-string (out)
+       (apply #'fprintf (make-instance 'FILE :stream out) fmt args))))
+   :start1 (memptr-ptr str)))
 
 (defun snprintf (string max-length fmt &rest args))
 
