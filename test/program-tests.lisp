@@ -13,3 +13,7 @@
 (program-test define-function1 :return-code 2)
 
 (program-test if-then-else1 :return-code 21)
+
+(program-test if-then-else2 :return-code 5)
+
+;; (program-test kr-echo :input "foobar" :output "foobar")

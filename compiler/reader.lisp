@@ -327,12 +327,12 @@
             (split-recurse it))
            ((position 'vacietis.c:? args)
             (let ((?pos it))
-              (append (list 'vacietis.c:if (parse-infix (subseq args 0 ?pos)))
-                      (aif (position 'vacietis.c:|:| args)
-                           (list (parse-infix (subseq args (1+ ?pos) it))
-                                 (parse-infix (subseq args (1+ it))))
-                           (read-error "Error parsing ?: trinary operator in: ~A"
-                                       args)))))
+              `(if (not (eql 0 ,(parse-infix (subseq args 0 ?pos))))
+                   ,@(aif (position 'vacietis.c:|:| args)
+                          (list (parse-infix (subseq args (1+ ?pos) it))
+                                (parse-infix (subseq args (1+ it))))
+                          (read-error "Error parsing ?: trinary operator in: ~A"
+                                      args)))))
            ((loop for op in *binary-ops-table*
                   thereis (position op args :start 1))
             (split-recurse it))
@@ -401,46 +401,46 @@
 (defvar *variable-declarations*)
 
 (defun read-control-flow-statement (statement)
-  (macrolet ((control-flow-case (statement &body cases)
-               `(acase ,statement
-                  ,@(loop for (symbols . body) in cases
-                          collect `(,symbols (list it ,@body))))))
-    (flet ((read-block-or-statement ()
-             (let ((next-char (next-char)))
-               (if (eql next-char #\{)
-                   (cons 'tagbody (read-c-block next-char))
-                   (read-c-statement next-char)))))
-     (if (eq statement 'vacietis.c:if)
-         (let* ((test       (parse-infix (next-exp)))
-                (then       (read-block-or-statement))
-                (next-char  (next-char nil))
-                (next-token (case next-char
-                              (#\e  (read-c-exp #\e))
-                              ((nil))
-                              (t    (c-unread-char next-char) nil)))
-                (if-exp    `(if (eql 0 ,test)
-                                ,(when (eq next-token 'vacietis.c:else)
-                                   (read-block-or-statement))
-                                ,then)))
-           (if (or (not next-token) (eq next-token 'vacietis.c:else))
-               if-exp
-               `(progn ,if-exp ,(%read-c-statement next-token))))
-         (control-flow-case statement
-           (vacietis.c:return (read-c-statement (next-char)))
-           (vacietis.c:while  (parse-infix (next-exp))
-                              (read-block-or-statement))
-           (vacietis.c:for    (let* ((*variable-types* (cons (make-hash-table)
-                                                             *variable-types*))
-                                     (*variable-declarations* ())
-                                     (initializations (progn
-                                                        (next-char)
-                                                        (read-c-statement
-                                                         (next-char)))))
-                                (list* *variable-declarations*
-                                       initializations
-                                       (mapcar #'parse-infix
-                                               (c-read-delimited-list #\( #\;))))
-                              (read-block-or-statement)))))))
+  (flet ((read-block-or-statement ()
+           (let ((next-char (next-char)))
+             (if (eql next-char #\{)
+                 (cons 'tagbody (read-c-block next-char))
+                 (read-c-statement next-char)))))
+    (if (eq statement 'vacietis.c:if)
+        (let* ((test       (parse-infix (next-exp)))
+               (then       (read-block-or-statement))
+               (next-char  (next-char nil))
+               (next-token (case next-char
+                             (#\e  (read-c-exp #\e))
+                             ((nil))
+                             (t    (c-unread-char next-char) nil)))
+               (if-exp    `(if (eql 0 ,test)
+                               ,(when (eq next-token 'vacietis.c:else)
+                                      (read-block-or-statement))
+                               ,then)))
+          (if (or (not next-token) (eq next-token 'vacietis.c:else))
+              if-exp
+              `(progn ,if-exp ,(%read-c-statement next-token))))
+        (case statement
+          (vacietis.c:return
+            `(return ,(or (read-c-statement (next-char)) 0)))
+          (vacietis.c:while
+            `(vacietis.c:for (nil nil ,(parse-infix (next-exp)) nil)
+               ,(read-block-or-statement)))
+          (vacietis.c:for
+            `(vacietis.c:for
+                 ,(let* ((*variable-types*        (cons (make-hash-table)
+                                                        *variable-types*))
+                         (*variable-declarations* ())
+                         (initializations         (progn
+                                                    (next-char)
+                                                    (read-c-statement
+                                                     (next-char)))))
+                        (list* *variable-declarations*
+                               initializations
+                               (mapcar #'parse-infix
+                                       (c-read-delimited-list #\( #\;))))
+               ,(read-block-or-statement)))))))
 
 (defun c-read-delimited-list (open-delimiter separator)
   (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\}) (#\; #\;)))

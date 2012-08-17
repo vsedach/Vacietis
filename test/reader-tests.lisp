@@ -63,7 +63,7 @@ a + b;
 return a > b ? a : b;
 }"
   (vacietis::c-fun max (a b) ()
-    (return (if (> a b) a b))))
+    (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b))))
 
 (reader-test function1
   "extern int max(int a, int b)
@@ -71,7 +71,7 @@ return a > b ? a : b;
 return a > b ? a : b;
 }"
   (vacietis::c-fun max (a b) ()
-    (return (if (> a b) a b))))
+    (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b))))
 
 ;;; function calls
 
@@ -120,19 +120,19 @@ return a > b ? a : b;
 
 (reader-test elvis0
   "a ? 1 : 2;"
-  (if a 1 2))
+  (cl:if (cl:not (cl:eql 0 a)) 1 2))
 
 (reader-test elvis1
   "a > b ? a : b;"
-  (if (> a b) a b))
+  (cl:if (cl:not (cl:eql 0 (> a b))) a b))
 
 (reader-test elvis-return
   "return a > b ? a : b;"
-  (return (if (> a b) a b)))
+  (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b)))
 
 (reader-test return1
   "return 1;"
-  (return 1))
+  (cl:return 1))
 
 (reader-test lognot1
   "foo = ~010;"
@@ -395,7 +395,7 @@ celsius = 5 * (fahr-32) / 9;
 printf(\"%d\t%d\n\", fahr, celsius);
 fahr = fahr + step;
 }"
-  (while (<= fahr upper)
+  (for (cl:nil cl:nil (<= fahr upper) cl:nil)
     (cl:tagbody
        (= celsius (* 5 (/ (- fahr 32) 9)))
        (printf "%dt%dn" fahr celsius)
@@ -439,7 +439,7 @@ fahr = fahr + step;
     (= upper 300)
     (= step 20)
     (= fahr lower)
-    (while (<= fahr upper)
+    (for (cl:nil cl:nil (<= fahr upper) cl:nil)
       (cl:tagbody
          (= celsius (* 5 (/ (- fahr 32) 9)))
          (printf "%dt%dn" fahr celsius)
@@ -483,10 +483,8 @@ while (c != EOF) {
 "
   (vacietis::c-fun main () ((c 0))
     (= c (getchar))
-    (while (!= c EOF)
-      (cl:tagbody
-         (putchar c)
-         (= c (getchar))))))
+    (vacietis.c:for (cl:nil cl:nil (!= c EOF) cl:nil)
+      (cl:tagbody (putchar c) (= c (getchar))))))
 
 (reader-test var-declare-and-initialize0
   "int x = 1;"
@@ -509,14 +507,14 @@ while (c != EOF) {
 }"
   (vacietis::c-fun pow (base exponent) ((result 0))
     (cl:progn (= result 1))
-    (while (> exponent 0)
+    (for (cl:nil cl:nil (> exponent 0) cl:nil)
       (cl:tagbody
          (cl:if (cl:eql 0 (% exponent 2))
                 cl:nil
                 (*= result base))
          (*= base base)
          (/= exponent 2)))
-    (return result)))
+    (cl:return result)))
 
 (reader-test empty-label
   "int main () { end:; }"
@@ -526,17 +524,20 @@ while (c != EOF) {
 
 (reader-test h&s-while2
   "while ( *char_pointer++ );"
-  (while (deref* (post++ char_pointer))
+  (for (cl:nil cl:nil (deref* (post++ char_pointer)) cl:nil)
     cl:nil))
 
 (reader-test h&s-while3
   "while ( *dest_pointer++ = *source_pointer++ );"
-  (while (= (deref* (post++ dest_pointer)) (deref* (post++ source_pointer)))
+  (for (cl:nil
+        cl:nil
+        (= (deref* (post++ dest_pointer)) (deref* (post++ source_pointer)))
+        cl:nil)
     cl:nil))
 
 (reader-test just-return
   "return;"
-  (return cl:nil))
+  (cl:return 0))
 
 (reader-test array-of-ints0
   "int foobar[];"

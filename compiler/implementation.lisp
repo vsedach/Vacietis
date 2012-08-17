@@ -191,9 +191,6 @@
         (go loop)
       break)))
 
-(defmacro vacietis.c:while (test &body body)
-  `(vacietis.c:for (nil nil ,test nil) ,@body))
-
 (defmacro vacietis.c:do (test &body body)
   `(tagbody loop
       ,@body
@@ -202,11 +199,6 @@
           (go break)
           (go loop))
     break))
-
-;;; control flow
-
-(defmacro vacietis.c:return (&optional value)
-  `(return ,(or value 0)))
 
 ;;; declarations
 
