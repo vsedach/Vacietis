@@ -211,11 +211,15 @@ return a > b ? a : b;
 
 (reader-test if-foo1
   "if foo { 1 + 2; }"
-  (if foo ((+ 1 2))))
+  (cl:if (cl:eql 0 foo)
+         cl:nil
+         (cl:tagbody (+ 1 2))))
 
 (reader-test if-foo2
   "if foo 1 + 2;"
-  (if foo ((+ 1 2))))
+  (cl:if (cl:eql 0 foo)
+         cl:nil
+         (+ 1 2)))
 
 (reader-test big-if
   "if ((SymbolValue(GC_PENDING,th) == NIL) &&
@@ -225,12 +229,15 @@ return a > b ? a : b;
         set_pseudo_atomic_interrupted(th);
         maybe_save_gc_mask_and_block_deferrables(NULL);
     }"
-  (if (&& (== (SymbolValue GC_PENDING th) NIL)
-          (&& (== (SymbolValue GC_INHIBIT th) NIL)
-              (< (random) (/ RAND_MAX 100))))
-      ((SetSymbolValue GC_PENDING T th)
-       (set_pseudo_atomic_interrupted th)
-       (maybe_save_gc_mask_and_block_deferrables NULL))))
+  (cl:if (cl:eql 0
+                 (&& (== (SymbolValue GC_PENDING th) NIL)
+                     (&& (== (SymbolValue GC_INHIBIT th) NIL)
+                         (< (random) (/ RAND_MAX 100)))))
+         cl:nil
+         (cl:tagbody
+            (SetSymbolValue GC_PENDING T th)
+            (set_pseudo_atomic_interrupted th)
+            (maybe_save_gc_mask_and_block_deferrables vacietis.c::NULL))))
 
 (reader-test smaller-if
   "if ((SymbolValue(GC_PENDING,th) == NIL) &&
@@ -238,10 +245,12 @@ return a > b ? a : b;
         (random() < RAND_MAX/100)) {
 1;
     }"
-  (if (&& (== (SymbolValue GC_PENDING th) NIL)
-          (&& (== (SymbolValue GC_INHIBIT th) NIL)
-              (< (random) (/ RAND_MAX 100))))
-      (1)))
+  (cl:if (cl:eql 0
+                 (&& (== (SymbolValue GC_PENDING th) NIL)
+                     (&& (== (SymbolValue GC_INHIBIT th) NIL)
+                         (< (random) (/ RAND_MAX 100)))))
+         cl:nil
+         (cl:tagbody 1)))
 
 ;;; casts and pointers
 
@@ -314,9 +323,13 @@ return a > b ? a : b;
         set_auto_gc_trigger((char *)dynamic_space_free_pointer
                             - (char *)current_dynamic_space);
     }"
-  (if (&& current_auto_gc_trigger (> dynamic_space_free_pointer current_auto_gc_trigger))
-      ((clear_auto_gc_trigger)
-       (set_auto_gc_trigger (- dynamic_space_free_pointer current_dynamic_space)))))
+  (cl:if (cl:eql 0 (&& current_auto_gc_trigger
+                       (> dynamic_space_free_pointer current_auto_gc_trigger)))
+         cl:nil
+         (cl:tagbody
+            (clear_auto_gc_trigger)
+            (set_auto_gc_trigger
+             (- dynamic_space_free_pointer current_dynamic_space)))))
 
 (reader-test deref-increment
   "*x++;"
@@ -383,9 +396,10 @@ printf(\"%d\t%d\n\", fahr, celsius);
 fahr = fahr + step;
 }"
   (while (<= fahr upper)
-    (= celsius (* 5 (/ (- fahr 32) 9)))
-    (printf "%dt%dn" fahr celsius)
-    (= fahr (+ fahr step))))
+    (cl:tagbody
+       (= celsius (* 5 (/ (- fahr 32) 9)))
+       (printf "%dt%dn" fahr celsius)
+       (= fahr (+ fahr step)))))
 
 (reader-test multiple-declaration0
   "int x, y;"
@@ -426,9 +440,10 @@ fahr = fahr + step;
     (= step 20)
     (= fahr lower)
     (while (<= fahr upper)
-      (= celsius (* 5 (/ (- fahr 32) 9)))
-      (printf "%dt%dn" fahr celsius)
-      (= fahr (+ fahr step)))))
+      (cl:tagbody
+         (= celsius (* 5 (/ (- fahr 32) 9)))
+         (printf "%dt%dn" fahr celsius)
+         (= fahr (+ fahr step))))))
 
 (reader-test k&r-pg16
   "void main()
@@ -469,8 +484,9 @@ while (c != EOF) {
   (vacietis::c-fun main () ((c 0))
     (= c (getchar))
     (while (!= c EOF)
-      (putchar c)
-      (= c (getchar)))))
+      (cl:tagbody
+         (putchar c)
+         (= c (getchar))))))
 
 (reader-test var-declare-and-initialize0
   "int x = 1;"
@@ -494,9 +510,12 @@ while (c != EOF) {
   (vacietis::c-fun pow (base exponent) ((result 0))
     (cl:progn (= result 1))
     (while (> exponent 0)
-      (if (% exponent 2) ((*= result base)))
-      (*= base base)
-      (/= exponent 2))
+      (cl:tagbody
+         (cl:if (cl:eql 0 (% exponent 2))
+                cl:nil
+                (*= result base))
+         (*= base base)
+         (/= exponent 2)))
     (return result)))
 
 (reader-test empty-label

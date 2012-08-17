@@ -119,6 +119,24 @@ sizeof (foobar);"
   "sizeof (int);"
   1)
 
+(eval-test if-then-else1
+  "int baz;
+if (2 < 1) {
+  baz = 2;
+} else {
+  baz = 3;
+}
+baz;"
+  3)
+
+(eval-test if-then-none
+  "int baz = 0;
+if (2 < 1) {
+  baz = 2;
+}
+baz;"
+  0)
+
 ;;; fixme: literals and '' single quoting
 ;; (eval-test sizeof-literal
 ;;   "sizeof('c');"

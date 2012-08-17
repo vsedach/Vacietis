@@ -53,7 +53,7 @@
 (defvar *line-number* 1)
 
 (defun c-read-char ()
-  (let ((c (read-char %in nil 'end)))
+  (let ((c (read-char %in nil)))
     (when (eql c #\Newline)
       (incf *line-number*))
     c))
@@ -74,17 +74,17 @@
 (defun slurp-while (predicate)
   (let ((string-buffer (make-string-buffer)))
     (loop-reading
-       while (and (not (eq c 'end)) (funcall predicate c))
+       while (and c (funcall predicate c))
        do (vector-push-extend c string-buffer)
-       finally (unless (eq c 'end) (c-unread-char c)))
+       finally (when c (c-unread-char c)))
     string-buffer))
 
 (defun next-char (&optional (eof-error? t))
   "Returns the next character, skipping over whitespace and comments"
   (loop-reading
      while (case c
-             (end (when eof-error?
-                    (read-error "Unexpected end of file")))
+             ((nil) (when eof-error?
+                      (read-error "Unexpected end of file")))
              (#\/ (case (peek-char nil %in)
                     (#\/ (c-read-line))
                     (#\* (slurp-while (let ((previous-char (code-char 0)))
@@ -121,12 +121,15 @@
   (labels ((digit-value (c) (- (char-code c) 48)))
     (let ((value (digit-value c0)))
       (loop-reading
-           (cond ((eq c 'end) (return value))
+           (cond ((null c)
+                  (return value))
                  ((char<= #\0 c #\9)
                   (setf value (+ (* 10 value) (digit-value c))))
                  ((or (char-equal c #\E) (char= c #\.))
                   (return (read-float value c)))
-                 (t (c-unread-char c) (return value)))))))
+                 (t
+                  (c-unread-char c)
+                  (return value)))))))
 
 (defun read-c-number (c)
   (prog1 (if (char= c #\0)
@@ -171,7 +174,7 @@
        (if (char= c #\") ;; c requires concatenation of adjacent string literals, retardo
            (progn (setf c (next-char nil))
                   (unless (eql c #\")
-                    (unless (eq c 'end) (c-unread-char c))
+                    (when c (c-unread-char c))
                     (return (literal string))))
            (vector-push-extend (read-char-literal c) string)))))
 
@@ -401,30 +404,43 @@
   (macrolet ((control-flow-case (statement &body cases)
                `(acase ,statement
                   ,@(loop for (symbols . body) in cases
-                          collect `(,symbols (list* it ,@body))))))
+                          collect `(,symbols (list it ,@body))))))
     (flet ((read-block-or-statement ()
              (let ((next-char (next-char)))
                (if (eql next-char #\{)
-                   (read-c-block next-char)
-                   (list (read-c-statement next-char))))))
-     (control-flow-case statement
-       (vacietis.c:return (list (read-c-statement (next-char))))
-       (vacietis.c:if     (parse-infix (next-exp))
-                          (list (read-block-or-statement)))
-       (vacietis.c:while  (parse-infix (next-exp))
-                          (read-block-or-statement))
-       (vacietis.c:for    (let* ((*variable-types* (cons (make-hash-table)
-                                                         *variable-types*))
-                                 (*variable-declarations* ())
-                                 (initializations (progn
-                                                    (next-char)
-                                                    (read-c-statement
-                                                     (next-char)))))
-                            (list* *variable-declarations*
-                                   initializations
-                                   (mapcar #'parse-infix
-                                           (c-read-delimited-list #\( #\;))))
-                          (read-block-or-statement))))))
+                   (cons 'tagbody (read-c-block next-char))
+                   (read-c-statement next-char)))))
+     (if (eq statement 'vacietis.c:if)
+         (let* ((test       (parse-infix (next-exp)))
+                (then       (read-block-or-statement))
+                (next-char  (next-char nil))
+                (next-token (case next-char
+                              (#\e  (read-c-exp #\e))
+                              ((nil))
+                              (t    (c-unread-char next-char) nil)))
+                (if-exp    `(if (eql 0 ,test)
+                                ,(when (eq next-token 'vacietis.c:else)
+                                   (read-block-or-statement))
+                                ,then)))
+           (if (or (not next-token) (eq next-token 'vacietis.c:else))
+               if-exp
+               `(progn ,if-exp ,(%read-c-statement next-token))))
+         (control-flow-case statement
+           (vacietis.c:return (read-c-statement (next-char)))
+           (vacietis.c:while  (parse-infix (next-exp))
+                              (read-block-or-statement))
+           (vacietis.c:for    (let* ((*variable-types* (cons (make-hash-table)
+                                                             *variable-types*))
+                                     (*variable-declarations* ())
+                                     (initializations (progn
+                                                        (next-char)
+                                                        (read-c-statement
+                                                         (next-char)))))
+                                (list* *variable-declarations*
+                                       initializations
+                                       (mapcar #'parse-infix
+                                               (c-read-delimited-list #\( #\;))))
+                              (read-block-or-statement)))))))
 
 (defun c-read-delimited-list (open-delimiter separator)
   (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\}) (#\; #\;)))
@@ -496,7 +512,7 @@
     (otherwise (read-error "Expected opening brace '{' but found '~A'" sc))))
 
 (defun read-struct (name)
-  (let* ((slots (read-struct-slots (next-char)))
+  (let* ((slots        (read-struct-slots (next-char)))
          (declaration `(vacietis::c-struct ,name ,@slots)))
     (when slots
       (setf (gethash name *c-structs*) slots)
@@ -535,17 +551,19 @@
 (defun read-infix-exp (next-token)
   (parse-infix (cons next-token
                      (loop for c = (next-char nil)
-                           until (or (eql c #\;) (eql c 'end))
+                           until (or (eql c #\;) (null c))
                            collect (read-c-exp c)))))
+
+(defun %read-c-statement (token)
+  (multiple-value-bind (statement label) (read-labeled-statement token)
+    (acond (label                    (values statement label))
+           ((read-declaration token) (if (eq t it) (values) it))
+           (t                        (or (read-control-flow-statement token)
+                                         (read-infix-exp token))))))
 
 (defun read-c-statement (c)
   (unless (eql #\; c)
-   (let ((nt (read-c-exp c)))
-     (multiple-value-bind (statement label) (read-labeled-statement nt)
-       (acond (label (values statement label))
-              ((read-declaration nt) (if (eq t it) (values) it))
-              (t (or (read-control-flow-statement nt)
-                     (read-infix-exp nt))))))))
+    (%read-c-statement (read-c-exp c))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
@@ -570,7 +588,8 @@
                  *ops* :test #'string= :key #'symbol-name)))
     (let ((one-match (seq-match one))
           (two (c-read-char)))
-      (acond ((eq two 'end) one-match)
+      (acond ((null two)
+              one-match)
              ((seq-match one two)
               (let ((three-match (seq-match one two (peek-char nil %in))))
                 (if three-match

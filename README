@@ -28,6 +28,7 @@ Vacietis is licensed under the LLGPL (see the file LICENSE included
 with the distribution for details).
 
 TODO:
+* struct accessors
 * enums
 * function pointers
 * libc stdio: printf/scanf, binary streams, error codes, fread/fwrite

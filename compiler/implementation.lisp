@@ -205,10 +205,6 @@
 
 ;;; control flow
 
-(defmacro vacietis.c:if (test then-statements &rest clauses)
-  `(if ,test
-       (tagbody ,@then-statements)))
-
 (defmacro vacietis.c:return (&optional value)
   `(return ,(or value 0)))
 
@@ -221,6 +217,7 @@
 ;;; structs
 
 (defmacro c-struct (name slots)
+  ;; DEFINE ACCESSORS!!!
   )
 
 ;;; literals

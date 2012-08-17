@@ -9,3 +9,7 @@
 (program-test main-return-include1 :return-code 9)
 
 (program-test include-libc :return-code 64)
+
+(program-test define-function1 :return-code 2)
+
+(program-test if-then-else1 :return-code 21)
