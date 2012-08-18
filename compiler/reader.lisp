@@ -180,8 +180,6 @@
 
 ;;; preprocessor
 
-(defvar *preprocessor-defines* (make-hash-table))
-
 (defvar preprocessor-if-stack ())
 
 (defmacro lookup-define ()
@@ -256,7 +254,7 @@
       (vacietis.c:define
        (setf (lookup-define)
              (if (eql #\( (peek-char t %in))
-                 (let ((args (c-read-delimited-strings t))
+                 (let ((args     (c-read-delimited-strings t))
                        (template (string-trim '(#\Space #\Tab) (c-read-line))))
                    (lambda (substitutions)
                      (if args
@@ -281,8 +279,7 @@
                            (directory-namestring
                             (or *load-truename* *compile-file-truename*)))
                           *preprocessor-defines*)
-             (use-package (find-package (format nil "VACIETIS.LIBC.~:@(~A~)"
-                                                include-file))))))
+             (include-libc-file include-file))))
       (vacietis.c:if
        (push 'if preprocessor-if-stack)
        (unless (preprocessor-test (c-read-line))

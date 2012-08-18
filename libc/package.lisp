@@ -2,18 +2,23 @@
 (named-readtables:in-readtable vacietis:vacietis)
 
 (defpackage #:vacietis.libc.errno.h
-  (:use)
+  (:use #:cl #:named-readtables #:vacietis)
   (:export #:errno))
 
 (defpackage #:vacietis.libc.stddef.h
-  (:use #:named-readtables #:vacietis #:cl)
+  (:use #:cl #:named-readtables #:vacietis)
   (:export
    #:NULL
    #:offsetof))
 
-(defpackage #:vacietis.libc.math.h
-  (:use #:cl #:vacietis #:named-readtables)
-  (:import-from #:vacietis.c #:deref*)
+(defmacro deflibcpkg (name &rest other-opts)
+  `(defpackage ,name
+     (:use #:cl #:named-readtables #:vacietis
+           #:vacietis.libc.errno.h #:vacietis.libc.stddef.h)
+     (:import-from #:vacietis.c #:deref*)
+     ,@other-opts))
+
+(deflibcpkg #:vacietis.libc.math.h
   (:export
    #:HUGE_VAL
    #:sin
@@ -39,8 +44,7 @@
    #:frexp
    #:modf))
 
-(defpackage #:vacietis.libc.ctype.h
-  (:use #:cl #:named-readtables)
+(deflibcpkg #:vacietis.libc.ctype.h
   (:export
    #:isspace
    #:isalnum
@@ -56,9 +60,7 @@
    #:toupper
    #:tolower))
 
-(defpackage #:vacietis.libc.stdio.h
-  (:use #:cl #:named-readtables #:vacietis #:vacietis.libc.stddef.h)
-  (:import-from #:vacietis.c #:deref*)
+(deflibcpkg #:vacietis.libc.stdio.h
   (:shadow #:remove)
   (:export
    #:EOF
@@ -96,15 +98,11 @@
    #:fsetpos
    ))
 
-(defpackage #:vacietis.libc.string.h
-  (:use #:cl #:vacietis #:named-readtables #:vacietis.libc.stddef.h)
+(deflibcpkg #:vacietis.libc.string.h
   (:export
    #:strerror))
 
-(defpackage #:vacietis.libc.stdlib.h
-  (:use #:cl #:vacietis #:named-readtables
-        #:vacietis.libc.errno.h #:vacietis.libc.stddef.h)
-  (:import-from #:vacietis.c #:deref*)
+(deflibcpkg #:vacietis.libc.stdlib.h
   (:shadow #:abort)
   (:export
    #:malloc

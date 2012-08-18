@@ -21,6 +21,8 @@
 
    ;; utilities
    #:char*-to-string
+   #:define
+   #:include-libc-file
 
    ;; runtime
    #:run-c-program

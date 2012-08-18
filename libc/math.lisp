@@ -1,7 +1,7 @@
 (in-package #:vacietis.libc.math.h)
 (in-readtable vacietis)
 
-(defconstant HUGE_VAL most-positive-double-float)
+(define HUGE_VAL most-positive-double-float)
 
 (defun atan2 (x y)
   (atan x y))

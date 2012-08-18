@@ -15,6 +15,7 @@
              (:file "types")
              (:file "compiler-data")
              (:file "implementation")
+             (:file "include")
              (:file "reader")))
    (:module :libc
             :serial t
