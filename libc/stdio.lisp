@@ -141,17 +141,30 @@
                        c)
     (error () EOF)))
 
-;;; fread/fwrite
+;;; fread/fwrite, only work for byte arrays for now
 
-(defun fread (array obj-size num-obj fd)
-  (error "FREAD NOT IMPLEMENTED YET")
-  ;; todo
-  )
+(defun fread (mem element_size count fd)
+  (handler-case
+      (let* ((start    (memptr-ptr mem))
+             (end      (+ start (* element_size count)))
+             (position (read-sequence (memptr-mem mem) (fd-stream fd)
+                                      :start start :end end)))
+        (when (< position end)
+          (setf (feof fd) 1))
+        (- position start))
+    (error ()
+      (setf (ferror fd) 14) ;; or something
+      0)))
 
-(defun fwrite (array obj-size num-obj fd)
-  (error "FWRITE NOT IMPLEMENTED YET")
-  ;; todo
-  )
+(defun fwrite (mem element_size count fd)
+  (handler-case
+      (let ((start (memptr-ptr mem)))
+        (write-sequence (memptr-mem mem) (fd-stream fd)
+                        :start start :end (+ start (* element_size count)))
+        count)
+    (error ()
+      (setf (ferror fd) 14) ;; fixme
+      0)))
 
 ;;; file positioning
 
