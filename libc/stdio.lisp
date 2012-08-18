@@ -1,7 +1,7 @@
 (in-package #:vacietis.libc.stdio.h)
 (in-readtable vacietis)
 
-(defconstant EOF -1)
+(define EOF -1)
 
 ;;; FILEs/streams
 
@@ -24,6 +24,7 @@
 
 ;;; file operations
 
+;; have to do something about EEXIST
 (defun open-stream (filename mode)
   (let* ((m (char*-to-string mode))
          (opts (cond ((string= m "r") '(:direction :input))
@@ -40,7 +41,11 @@
 
 (defun fopen (filename mode)
   (handler-case (make-instance 'FILE :stream (open-stream filename mode))
-    (error () NULL)))
+    (file-error ()
+      (setf errno ENOENT)
+      NULL)
+    (error ()
+      NULL)))
 
 (defun fflush (fd)
   (unless (eql fd NULL)
@@ -58,7 +63,9 @@
   (handler-case (progn (fclose fd)
                        (clearerr fd)
                        (setf (fd-stream fd) (open-stream filename mode)))
-    (error () NULL)))
+    (error ()
+      (setf errno EIO)
+      NULL)))
 
 (defun remove (filename)
   (handler-case (progn (delete-file (char*-to-string filename))
@@ -98,12 +105,19 @@
 
 (defun fgetc (fd)
   (handler-case (char-code (read-char (fd-stream fd)))
-    (error () EOF)))
+    (end-of-file ()
+      (setf (feof fd) 1)
+      EOF)
+    (error ()
+      (setf (ferror fd) EIO)
+      EOF)))
 
 (defun fputc (c fd)
   (handler-case (progn (write-char (code-char c) (fd-stream fd))
                        c)
-    (error () EOF)))
+    (error ()
+      (setf (ferror fd) EIO)
+      EOF)))
 
 (defun fgets-is-dumb (str n fd replace-newline?)
   (handler-case
@@ -116,7 +130,12 @@
                           (loop-finish)))
               finally (setf (aref str i) 0))
         str)
-    (error () NULL)))
+    (end-of-file ()
+      (setf (feof fd) 1)
+      NULL)
+    (error ()
+      (setf (ferror fd) EIO)
+      NULL)))
 
 (defun fgets (str n fd)
   (fgets-is-dumb str n fd nil))
@@ -127,7 +146,9 @@
 (defun fputs (str fd)
   (handler-case (progn (write-string (char*-to-string str) (fd-stream fd))
                        0)
-    (error () EOF)))
+    (error ()
+      (setf (ferror fd) EIO)
+      EOF)))
 
 (defun puts (str)
   (when (eql EOF (fputs str stdout))
@@ -139,7 +160,9 @@
 (defun ungetc (c fd)
   (handler-case (progn (unread-char (code-char c) (fd-stream fd))
                        c)
-    (error () EOF)))
+    (error ()
+      (setf (ferror fd) EIO)
+      EOF)))
 
 ;;; fread/fwrite, only work for byte arrays for now
 
@@ -153,7 +176,7 @@
           (setf (feof fd) 1))
         (- position start))
     (error ()
-      (setf (ferror fd) 14) ;; or something
+      (setf (ferror fd) EIO)
       0)))
 
 (defun fwrite (mem element_size count fd)
@@ -163,14 +186,14 @@
                         :start start :end (+ start (* element_size count)))
         count)
     (error ()
-      (setf (ferror fd) 14) ;; fixme
+      (setf (ferror fd) EIO)
       0)))
 
 ;;; file positioning
 
-(defconstant SEEK_SET 0)
-(defconstant SEEK_CUR 1)
-(defconstant SEEK_END 2)
+(define SEEK_SET 0)
+(define SEEK_CUR 1)
+(define SEEK_END 2)
 
 (defun fseek (fd offset origin) ;; dumbest function in stdio
   (handler-case
@@ -179,8 +202,11 @@
                                 (0 offset)
                                 (1 (+ offset (file-position stream)))
                                 (2 (+ offset (file-length stream)))))
+        (setf (feof fd) 0)
         0)
-    (error () 1)))
+    (error ()
+      (setf (ferror fd) ESPIPE) ;; is this the right error code?
+      1)))
 
 (defun ftell (fd)
   (or (file-position (fd-stream fd)) -1))
@@ -192,14 +218,19 @@
 (defun fgetpos (fd pos_ptr)
   (let ((pos (file-position (fd-stream fd))))
     (if pos
-        (progn (setf (deref* pos_ptr) pos) 0)
-        1)))
+        (progn (setf (deref* pos_ptr) pos)
+               0)
+        (progn (setf errno ENOTTY)
+               1))))
 
 (defun fsetpos (fd pos_ptr)
   (handler-case (progn (if (file-position (fd-stream fd) (deref* pos_ptr))
                            0
-                           1))
-    (error () 1)))
+                           (progn (setf errno ESPIPE)
+                                  1)))
+    (error ()
+      (setf errno ESPIPE) ;; is this the right code?
+      1)))
 
 ;;; printf
 

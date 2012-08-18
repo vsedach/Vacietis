@@ -3,7 +3,43 @@
 
 (defpackage #:vacietis.libc.errno.h
   (:use #:cl #:named-readtables #:vacietis)
-  (:export #:errno))
+  (:export
+   #:errno
+   #:EPERM
+   #:ENOENT
+   #:ESRCH
+   #:EINTR
+   #:EIO
+   #:ENXIO
+   #:E2BIG
+   #:ENOEXEC
+   #:EBADF
+   #:ECHILD
+   #:EAGAIN
+   #:ENOMEM
+   #:EACCES
+   #:EFAULT
+   #:ENOTBLK
+   #:EBUSY
+   #:EEXIST
+   #:EXDEV
+   #:ENODEV
+   #:ENOTDIR
+   #:EISDIR
+   #:EINVAL
+   #:ENFILE
+   #:EMFILE
+   #:ENOTTY
+   #:ETXTBSY
+   #:EFBIG
+   #:ENOSPC
+   #:ESPIPE
+   #:EROFS
+   #:EMLINK
+   #:EPIPE
+   #:EDOM
+   #:ERANGE
+   ))
 
 (defpackage #:vacietis.libc.stddef.h
   (:use #:cl #:named-readtables #:vacietis)
