@@ -63,10 +63,6 @@
     (decf *line-number*))
   (unread-char c %in))
 
-(defun c-read-line ()
-  (incf *line-number*)
-  (read-line %in))
-
 (defmacro loop-reading (&body body)
   `(loop with c do (setf c (c-read-char))
         ,@body))
@@ -79,20 +75,29 @@
        finally (when c (c-unread-char c)))
     string-buffer))
 
+(defun %maybe-read-comment ()
+  (case (peek-char nil %in)
+    (#\/ (incf *line-number*)
+         (read-line %in))
+    (#\* (slurp-while (let ((previous-char (code-char 0)))
+                        (lambda (c)
+                          (prog1 (not (and (char= previous-char #\*)
+                                           (char= c #\/)))
+                            (setf previous-char c)))))
+         (c-read-char))))
+
+(defun read-c-comment (%in slash)
+  (declare (ignore slash))
+  (%maybe-read-comment)
+  (values))
+
 (defun next-char (&optional (eof-error? t))
   "Returns the next character, skipping over whitespace and comments"
   (loop-reading
      while (case c
-             ((nil) (when eof-error?
-                      (read-error "Unexpected end of file")))
-             (#\/ (case (peek-char nil %in)
-                    (#\/ (c-read-line))
-                    (#\* (slurp-while (let ((previous-char (code-char 0)))
-                                        (lambda (c)
-                                          (prog1 (not (and (char= previous-char #\*)
-                                                           (char= c #\/)))
-                                            (setf previous-char c)))))
-                         (c-read-char))))
+             ((nil)                     (when eof-error?
+                                          (read-error "Unexpected end of file")))
+             (#\/                       (%maybe-read-comment))
              ((#\Space #\Newline #\Tab) t))
      finally (return c)))
 
@@ -182,6 +187,20 @@
 
 (defvar preprocessor-if-stack ())
 
+(defun pp-read-line ()
+  (let (comment-follows?)
+   (prog1
+       (slurp-while (lambda (c)
+                      (case c
+                        (#\Newline)
+                        (#\/ (if (find (peek-char nil %in nil nil) "/*")
+                                 (progn (setf comment-follows? t) nil)
+                                 t))
+                        (t t))))
+     (c-read-char)
+     (when comment-follows?
+       (%maybe-read-comment)))))
+
 (defmacro lookup-define ()
   `(gethash (read-c-identifier (next-char)) *preprocessor-defines*))
 
@@ -190,7 +209,7 @@
 
 (defun preprocessor-skip-branch ()
   (let ((if-nest-depth 1))
-    (loop for line = (c-read-line) do
+    (loop for line = (pp-read-line) do
          (cond ((starts-with? line "#if")
                 (incf if-nest-depth))
                ((and (starts-with? line "#endif")
@@ -200,7 +219,7 @@
                ((and (starts-with? line "#elif")
                      (= 1 if-nest-depth))
                 (case (car preprocessor-if-stack)
-                  (if (when (preprocessor-test (c-read-line))
+                  (if (when (preprocessor-test (pp-read-line))
                         (setf (car preprocessor-if-stack) 'elif)
                         (return)))
                   (elif nil)
@@ -255,21 +274,21 @@
        (setf (lookup-define)
              (if (eql #\( (peek-char t %in))
                  (let ((args     (c-read-delimited-strings t))
-                       (template (string-trim '(#\Space #\Tab) (c-read-line))))
+                       (template (string-trim '(#\Space #\Tab) (pp-read-line))))
                    (lambda (substitutions)
                      (if args
                          (fill-in-template args template substitutions)
                          template)))
-                 (c-read-line))))
+                 (pp-read-line))))
       (vacietis.c:undef
        (remhash (read-c-identifier (next-char)) *preprocessor-defines*)
-       (c-read-line))
+       (pp-read-line))
       (vacietis.c:include
        (let* ((delimiter
                (case (next-char)
                  (#\" #\") (#\< #\>)
                  (otherwise (read-error "Error reading include path: ~A"
-                                        (c-read-line)))))
+                                        (pp-read-line)))))
               (include-file
                (slurp-while (lambda (c) (char/= c delimiter)))))
          (next-char)
@@ -282,7 +301,7 @@
              (include-libc-file include-file))))
       (vacietis.c:if
        (push 'if preprocessor-if-stack)
-       (unless (preprocessor-test (c-read-line))
+       (unless (preprocessor-test (pp-read-line))
          (preprocessor-skip-branch)))
       (vacietis.c:ifdef
        (push 'if preprocessor-if-stack)
@@ -306,7 +325,7 @@
            (preprocessor-skip-branch)
            (read-error "Misplaced #elif")))
       (otherwise ;; line, pragma, error ignored for now
-       (c-read-line))))
+       (pp-read-line))))
   nil)
 
 ;;; infix
@@ -634,6 +653,8 @@
               collect `(:macro-char ,i 'read-c-toplevel nil))
 
          (:macro-char #\# 'read-c-macro nil)
+
+         (:macro-char #\/ 'read-c-comment nil)
 
          ;; numbers (should this be here?)
          ,@(loop for i from 0 upto 9

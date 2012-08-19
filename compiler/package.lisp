@@ -25,6 +25,7 @@
    #:include-libc-file
 
    ;; runtime
+   #:load-c-file
    #:run-c-program
    ))
 

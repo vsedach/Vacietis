@@ -39,7 +39,7 @@
        (unwind-protect
             (progn
               (let ((*package* test-package))
-                (vacietis.reader::load-c-file
+                (load-c-file
                  (merge-pathnames
                   (format nil "programs/~(~A~)/main.c" ',name)
                   (directory-namestring #.*compile-file-truename*))))

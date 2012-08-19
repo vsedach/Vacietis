@@ -16,4 +16,6 @@
 
 (program-test if-then-else2 :return-code 5)
 
+(program-test different-comment-styles :return-code 9)
+
 ;; (program-test kr-echo :input "foobar" :output "foobar")
