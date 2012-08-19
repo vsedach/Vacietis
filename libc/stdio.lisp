@@ -19,9 +19,6 @@
   (setf (feof fd)   0
         (ferror fd) 0))
 
-(defun perror (str)
-  (fprintf stderr "%s: %s\n" str "error message"))
-
 ;;; file operations
 
 ;; have to do something about EEXIST
@@ -97,10 +94,6 @@
        (progn (replace str newname :end1 (length newname))
               str))))
 
-(defun setvbuf (fd# buf mode size)
-  (declare (ignore fd# buf mode size))
-  0)
-
 ;;; character I/O
 
 (defun fgetc (fd)
@@ -112,12 +105,24 @@
       (setf (ferror fd) EIO)
       EOF)))
 
+(defun getc (fd)
+  (fgetc fd))
+
+(defun getchar ()
+  (getc stdin))
+
 (defun fputc (c fd)
   (handler-case (progn (write-char (code-char c) (fd-stream fd))
                        c)
     (error ()
       (setf (ferror fd) EIO)
       EOF)))
+
+(defun putc (c fd)
+  (fputc c fd))
+
+(defun putchar (c)
+  (fputc c stdout))
 
 (defun fgets-is-dumb (str n fd replace-newline?)
   (handler-case
@@ -251,3 +256,27 @@
 
 (defun snprintf (string max-length fmt &rest args))
 
+(defun perror (str)
+  (if (or (eql NULL str)
+          (eql 0 (aref (memptr-mem str) (memptr-ptr str))))
+      (fprintf stderr (string-to-char* "%s\\n") (strerror errno))
+      (fprintf stderr (string-to-char* "%s: %s\\n") str (strerror errno))))
+
+;;; things that have no effect
+
+(defun setvbuf (fd buf mode size)
+  (declare (ignore fd buf mode size))
+  0)
+
+(defun setbuf (fd buf)
+  (declare (ignore fd buf))
+  0)
+
+(define FILENAME_MAX 1024)
+(define FOPEN_MAX    1024)
+(define BUFSIZ       512)
+(define L_tmpnam     16)
+(define TMP_MAX      1024)
+(define _IOFBF       1)
+(define _IOLBF       2)
+(define _IONBF       3)

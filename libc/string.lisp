@@ -2,4 +2,4 @@
 (in-readtable vacietis)
 
 (defun strerror (errnum)
-  (string-to-char* "Some kind of error"))
+  (aref vacietis.libc.errno.h::errno-strings errnum))

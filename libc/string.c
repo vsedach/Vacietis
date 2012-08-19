@@ -3,86 +3,6 @@
 
 #define size_t int
 
-char *strcpy(char *s1, const char *s2) {
-  char *s = s1;
-  while ( (*s++ = *s2++) != 0 );
-  return s1;
-}
-
-char *strncpy(char *s1, const char *s2, size_t n) {
-	char *s = s1;
-
-	while (n) {
-		if ((*s = *s2) != 0) s2++; /* Need to fill tail with 0s. */
-		++s;
-		--n;
-	}
-
-	return s1;
-}
-
-char *strcat(char *  s1,  const char *  s2)
-{
-	 char *s = s1;
-
-	while (*s++);
-	--s;
-	while ((*s++ = *s2++) != 0);
-
-	return s1;
-}
-
-char *strncat(char *  s1,  const char *  s2,
-				size_t n)
-{
-	 char *s = s1;
-
-	while (*s++);
-	--s;
-	while (n && ((*s = *s2++) != 0)) {
-		--n;
-		++s;
-	}
-	*s = 0;
-
-	return s1;
-}
-
-int strcmp( const char *s1,  const char *s2)
-{
-
-	int r;
-
-	while (((r = ((int)(*((uchar *)s1))) - *((uchar *)s2++))
-			== 0) && *s1++);
-
-	return r;
-}
-
-// yup, this is real code, formatting and all
-int strncmp( const char *s1,  const char *s2, size_t n)
-{
-	int r = 0;
-
-	while (n--
-		   && ((r = ((int)(*((unsigned char *)s1))) - *((unsigned char *)s2++))
-			== 0)
-		   && *s1++);
-
-	return r;
-}
-
-char *strchr( const char *s, int c)
-{
-	do {
-		if (*s == ((char)c)) {
-			return (char *) s;	/* silence the warning */
-		}
-	} while (*s++);
-
-	return NULL;
-}
-
 char *strrchr( const  char *s, int c)
 {
 	 const char *p;
@@ -146,12 +66,6 @@ char *strstr(const char *s1, const char *s2)
 	} while (1);
 }
 
-size_t strlen(const char *s) {
-	const char *p;
-	for (p=s ; *p ; p++);
-	return p - s;
-}
-
 char *strtok(char *  s1, const char *  s2) {
 	static char *next_start;	/* Initialized to 0 since in bss. */
 	return strtok_r(s1, s2, &next_start);
@@ -172,4 +86,124 @@ char *strtok_r(char *  s1, const char *  s2, char **  next_start) {
     *next_start = p;
   }
   return s;
+}
+
+// The following functions are from ZetaC
+
+// str functions
+
+char *strcpy (char *s1, char *s2) {
+  char *s1temp = s1;
+
+  do *s1++ = *s2; while (*s2++);
+  return s1temp;
+}
+
+char *strncpy (char *s1, char *s2, int n) {
+  char *s1temp = s1;
+
+  while (--n >= 0) *s1++ = *s2 ? *s2++ : NULL;
+  return s1temp;
+}
+
+char *strcat (char *s1, char *s2) {
+  strcpy (s1 + strlen (s1), s2);
+  return s1;
+}
+
+char *strncat (char *s1, char *s2, int n) {
+  char *s1tmp;
+
+  s1tmp = s1 + strlen (s1);	/* Remember where the original string ended */
+  strncpy (s1tmp, s2, n);       /* The real work happens here */
+  s1tmp[n] = NUL;	        /* Must guarantee that result ends in NUL */
+  return s1;
+}
+
+char *strchr (char *s, char *c) {
+  do if (*s == c) return s; while (*s++);
+  return NULL;
+}
+
+
+int strcmp (char *s1, char *s2) {
+  char c1, c2;
+
+  while (*s1 || *s2) {
+    c1 = *s1++;
+    c2 = *s2++;
+    if (c1 < c2) return -1;
+    if (c1 > c2) return 1;
+  }
+  return 0;
+}
+
+int strncmp (char *s1, char *s2, int n) {
+  char c1, c2;
+
+  while (n-- > 0 && (*s1 || *s2)) {	 /* Just like strcmp, but for < n chars */
+    c1 = *s1++;
+    c2 = *s2++;
+    if (c1 < c2) return -1;
+    if (c1 > c2) return 1;
+  }
+  return 0;
+}
+
+int strlen (char *s) {
+  char *s0 = s;
+
+  while (*s) s++;
+  return s - s0;
+}
+
+int strcspn (char *s1, char *s2) {
+  int n = 0;
+
+  while (s1[n] &&              /* WHILE not at the end of S1, and */
+         !strchr(s2, s1[n]))   /* not not at one of S2s chars */
+    n++;
+  return n;
+}
+
+// mem functions
+
+char *memcpy (char *dest, char *src, int nbytes) {
+  void *tdest = dest;
+  while (nbytes-- > 0) *dest++ = *src++;
+  return tdest;
+}
+
+char *memmove (char *dest, char *src, int nbytes) {
+  void *tdest = destv;
+
+  if (src > dest) while (nbytes-- > 0) *dest++ = *src++;
+  else {
+    src += nbytes;
+    dest += nbytes;
+    while (nbytes-- > 0) *--dest = *--src;
+  }
+  return tdest;
+}
+
+char *memset (char *dest, char c, int nbytes) {
+  while (nbytes-- > 0) *dest++ = c;
+  return destv;
+}
+
+void *memchr (char *sv, char c, int nbytes) {
+  while (nbytes-- > 0) if (*s++ == c) return (void *)(s - 1);
+  return (void *)NULL;
+}
+
+int memcmp (char *m1v, char *m2v, int nbytes) {
+  char c1, c2;
+
+  while (nbytes-- > 0) {
+    c1 = *m1++;
+    c2 = *m2++;
+    if (c1 < c2) return -1;
+    if (c1 > c2) return 1;
+  }
+  return 0;
 }

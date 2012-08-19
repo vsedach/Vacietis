@@ -108,8 +108,8 @@
 
 ;;; program environment
 
-(defconstant EXIT_SUCCESS 0)
-(defconstant EXIT_FAILURE 1)
+(define EXIT_SUCCESS 0)
+(define EXIT_FAILURE 1)
 
 (defun abort ()
   (throw 'vacietis::c-exit EXIT_FAILURE))
