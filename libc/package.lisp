@@ -96,8 +96,13 @@
    #:toupper
    #:tolower))
 
+(deflibcpkg #:vacietis.libc.string.h
+  (:export
+   #:strerror))
+
 (deflibcpkg #:vacietis.libc.stdio.h
   (:shadow #:remove)
+  (:import-from #:vacietis.libc.string.h #:strerror)
   (:export
    #:EOF
    #:stdin
@@ -133,10 +138,6 @@
    #:fgetpos
    #:fsetpos
    ))
-
-(deflibcpkg #:vacietis.libc.string.h
-  (:export
-   #:strerror))
 
 (deflibcpkg #:vacietis.libc.stdlib.h
   (:shadow #:abort)

@@ -179,21 +179,21 @@
 
 ;;; iteration
 
-(defmacro vacietis.c:for ((bindings initialization test increment) &body body)
+(defmacro vacietis.c:for ((bindings initialization test increment) body)
   `(let ,bindings
      (tagbody ,@(awhen initialization (list it))
       loop
         (when (eql 0 ,test)
           (go break))
-        ,@body
+        ,body
       continue
         ,@(awhen increment (list it))
         (go loop)
       break)))
 
-(defmacro vacietis.c:do (test &body body)
+(defmacro vacietis.c:do (body test)
   `(tagbody loop
-      ,@body
+      ,body
     continue
       (if (eql 0 ,test)
           (go break)

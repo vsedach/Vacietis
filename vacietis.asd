@@ -27,7 +27,8 @@
              (:file "math")
              (:file "stdio")
              (:file "stdlib")
-             (:file "string"))
+             (:file "string")
+             (:static-file "string.c"))
             :depends-on (:compiler))
    (:module :runtime
             :components

@@ -237,7 +237,7 @@ return a > b ? a : b;
          (cl:tagbody
             (SetSymbolValue GC_PENDING T th)
             (set_pseudo_atomic_interrupted th)
-            (maybe_save_gc_mask_and_block_deferrables vacietis.c::NULL))))
+            (maybe_save_gc_mask_and_block_deferrables vacietis.test.reader::NULL))))
 
 (reader-test smaller-if
   "if ((SymbolValue(GC_PENDING,th) == NIL) &&
@@ -700,6 +700,15 @@ double imag;
 (reader-test struct-forward-declaration
   "struct cell;"
   (vacietis::c-struct cell))
+
+(reader-test function-returns-pointer
+  "char *strrchr( const  char *s, int c)
+{
+   return 2;
+}"
+  (vacietis::c-fun strrchr (* s c)
+      cl:nil
+    (cl:return 2)))
 
 ;; (reader-test function-returning-pointer-to-int
 ;;   "int *foo();"

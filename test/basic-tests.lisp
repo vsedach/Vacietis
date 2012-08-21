@@ -137,6 +137,12 @@ if (2 < 1) {
 baz;"
   0)
 
+(eval-test do-while1
+  "int foo = 0;
+do foo++; while (foo < 1);
+foo;"
+  1)
+
 ;;; fixme: literals and '' single quoting
 ;; (eval-test sizeof-literal
 ;;   "sizeof('c');"

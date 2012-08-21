@@ -443,6 +443,13 @@
           (vacietis.c:while
             `(vacietis.c:for (nil nil ,(parse-infix (next-exp)) nil)
                ,(read-block-or-statement)))
+          (vacietis.c:do
+           (let ((body (read-block-or-statement)))
+             (if (eql (next-exp) 'vacietis.c:while)
+                 (prog1
+                     `(vacietis.c:do ,body ,(parse-infix (next-exp)))
+                   (read-c-statement (next-char))) ;; semicolon
+                 (read-error "No 'while' following a 'do'"))))
           (vacietis.c:for
             `(vacietis.c:for
                  ,(let* ((*variable-types*        (cons (make-hash-table)
@@ -478,7 +485,7 @@
                             (c-read-delimited-list (next-char) #\,)))
         ,@(let* ((*variable-declarations* ())
                  (body (read-c-block (next-char))))
-                (cons *variable-declarations* body)))))
+            (cons *variable-declarations* body)))))
 
 ;; fixme: shit code
 (defun process-variable-declaration (spec type)
@@ -554,10 +561,9 @@
   (when (c-type? token)
     (multiple-value-bind (name type pointer?)
         (read-decl-prologue token)
-      (cond (pointer? (read-variable-declaration name nil))
+      (cond ((eql #\( (peek-char t %in)) (read-function name))
             ((eql type 'vacietis.c:struct) (read-struct name))
-            ((eql #\( (peek-char t %in)) (read-function name))
-            (t (read-variable-declaration name type))))))
+            (t (read-variable-declaration name (unless pointer? type)))))))
 
 (defun read-labeled-statement (token)
   (when (eql #\: (peek-char t %in))
