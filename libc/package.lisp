@@ -126,6 +126,7 @@
    #:fgets
    #:gets
    #:fputs
+   #:puts
    #:ungetc
    #:fread
    #:fwrite

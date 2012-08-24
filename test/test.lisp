@@ -50,6 +50,7 @@
                               :stdin (when ,input
                                        (make-string-input-stream ,input))
                               :stdout test-output-stream)))
+                (declare (ignorable result))
                 (when ,return-code
                   (is (equal ,return-code result)))
                 (when ,output
