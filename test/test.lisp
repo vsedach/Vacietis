@@ -42,7 +42,8 @@
                 (load-c-file
                  (merge-pathnames
                   (format nil "programs/~(~A~)/main.c" ',name)
-                  (directory-namestring #.*compile-file-truename*))))
+                  (directory-namestring
+                   #.(or *compile-file-truename* *load-truename*)))))
               (let* ((test-output-stream (when ,output
                                            (make-string-output-stream)))
                      (result (run-c-program
