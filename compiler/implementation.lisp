@@ -115,7 +115,7 @@
 (defmethod vacietis.c:- ((ptr1 memptr) (ptr2 memptr))
   (assert (eq (memptr-mem ptr1) (memptr-mem ptr2)) ()
           "Trying to subtract pointers from two different memory segments")
-  (make-memptr :mem (memptr-mem ptr1) :ptr (- (memptr-ptr ptr1) (memptr-ptr ptr2))))
+  (- (memptr-ptr ptr1) (memptr-ptr ptr2)))
 
 ;;; comparison operators
 

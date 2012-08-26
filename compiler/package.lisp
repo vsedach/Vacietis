@@ -20,6 +20,7 @@
    #:memptr-ptr
 
    ;; utilities
+   #:string-to-char*
    #:char*-to-string
    #:define
    #:include-libc-file

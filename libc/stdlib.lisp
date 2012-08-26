@@ -54,6 +54,8 @@
                              str)))
     (read-from-string
      str
+     nil
+     nil
      :start start
      :end   (position-if (lambda (c)
                            (not (find c ".0123456789+-eE")))
@@ -132,7 +134,8 @@
 (defun setenv (name value)
   (setf (gethash name vacietis::*environment*) value))
 
-(defun system (command)
+(defun system (command) ;; this could be eval
+  (declare (ignore command))
   0)
 
 ;;; search and sort

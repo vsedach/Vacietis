@@ -11,6 +11,9 @@
 (cl:defparameter vacietis.reader::*possible-prefix-ops*
   #(! ~ sizeof - + & * ++ --))
 
+(cl:defparameter vacietis.reader::*ambiguous-ops*
+  #(- + & *))
+
 (cl:defparameter vacietis.reader::*assignment-ops*
   #(= += -= *= /= %= <<= >>= &= ^= |\|=|))
 
@@ -366,8 +369,9 @@
           (loop for table across *binary-ops-table* do
                (awhen (match-binary-ops table)
                  (let ((prev (aref exp (1- it))))
-                   (unless (or (cast? prev)
-                               (find prev *possible-prefix-ops*))
+                   (unless (and (find (aref exp it) *ambiguous-ops*)
+                                (or (cast? prev)
+                                    (find prev *possible-prefix-ops*)))
                      (return-from parse-infix (parse-binary it))))))
           ;; unary operators
           (flet ((parse-rest (i)

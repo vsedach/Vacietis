@@ -789,6 +789,30 @@ double imag;
   "(2+3) * 6;"
   (* (+ 2 3) 6))
 
+(reader-test compare-plusplus
+  "*s++ == c;"
+  (== (deref* (cl:prog1 s (= s (+ s 1)))) c))
+
+(reader-test compare-plusplus1
+  "*s++ == --c;"
+  (== (deref* (cl:prog1 s (= s (+ s 1))))
+      (= c (- c 1))))
+
+(reader-test compare-plusplus2
+  "*s++ == *--c;"
+  (== (deref* (cl:prog1 s (= s (+ s 1))))
+      (deref* (= c (- c 1)))))
+
+(reader-test compare-plusplus3
+  "*s++ == **--c;"
+  (== (deref* (cl:prog1 s (= s (+ s 1))))
+      (deref* (deref* (= c (- c 1))))))
+
+(reader-test compare-plusplus4
+  "*s++ == ~**--c;"
+  (== (deref* (cl:prog1 s (= s (+ s 1))))
+      (~ (deref* (deref* (= c (- c 1)))))))
+
 ;; (reader-test function-returning-pointer-to-int
 ;;   "int *foo();"
 ;;   nil)

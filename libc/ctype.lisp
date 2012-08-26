@@ -4,6 +4,7 @@
 (defmacro chartest (cname exp)
   `(defun ,cname (code)
      (let ((c (code-char code)))
+       (declare (ignorable c))
        (if ,exp 1 0))))
 
 (defun space? (c)

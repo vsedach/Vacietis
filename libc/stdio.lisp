@@ -283,8 +283,7 @@
 	(loop repeat (- width (+ val-len leading-0s))
               do (write-char pad-char stream))))))
 
-(defun zclib>print-flonum-1 (val precision alternate-form? uppercase-E-format?
-			     e-format)
+(defun zclib>print-flonum-1 (val precision uppercase-E-format? e-format)
   "Returns the printed flonum as a string. VAL is assumed to be non-negative."
   (if (or (eql e-format #\e)		; We must go to Exx format.
           (and (eql e-format #\g)
@@ -298,12 +297,11 @@
       (format nil (format nil "~~,~dF" precision) val)))
 
 (defun zclib>print-flonum (val width precision pad-char right-justify?
-			   alternate-form? uppercase-E-format? always+- spacep
+                           uppercase-E-format? always+- spacep
 			   conv-char stream)
   "CONV-CHAR should be one of #\e, #\f, #\g"
   (let* ((negative? (minusp val))
-         (val       (if negative?  (- val) val))
-	 (buffer    (zclib>print-flonum-1 val precision alternate-form?
+	 (buffer    (zclib>print-flonum-1 (abs val) precision
                                           uppercase-E-format? conv-char))
          (val-len   (+ (length buffer)
                        (if (or negative? always+- spacep) 1 0))))
@@ -422,9 +420,16 @@
                                        stream))
                  ((#\e #\f #\g)
                   (assert (floatp (car args)))
-                  (zclib>print-flonum (pop args) (or width 0) (or precision 6)
-                                      pad-char right-justify alternate-form
-                                      uppercase always+- space-flag ch stream))
+                  (zclib>print-flonum (pop args)
+                                      (or width 0)
+                                      (or precision 6)
+                                      pad-char
+                                      right-justify
+                                      uppercase
+                                      always+-
+                                      space-flag
+                                      ch
+                                      stream))
                  (#\c
                   (unless (zerop (car args))
                     (write-char (code-char (pop args)) stream)))
@@ -434,10 +439,11 @@
                                       (vacietis.libc.string.h:strlen string))))
                     (loop repeat (- width length)
                           do (write-char pad-char stream))
-                    (let ((str (memptr-mem string)))
-                      (dotimes (i length)
-                        (write-char (code-char (aref str (+ start i)))
-                                    stream)))))
+                    (let ((str   (memptr-mem string))
+                          (start (memptr-ptr string)))
+                      (loop for i from start below (+ start length) do
+                           (write-char (code-char (aref str i))
+                                       stream)))))
                  (otherwise
                   (write-char char stream)))))
             (write-char (code-char ch) stream))))))

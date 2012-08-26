@@ -149,6 +149,11 @@ foo[0] = 123;
 foo[0];"
   123)
 
+(eval-test strlength1
+  "#include <string.h>
+strlen(\"foobar\");"
+  6)
+
 ;;; fixme: literals and '' single quoting
 ;; (eval-test sizeof-literal
 ;;   "sizeof('c');"
