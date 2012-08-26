@@ -13,7 +13,6 @@
             :components
             ((:file "package")
              (:file "types")
-             (:file "compiler-data")
              (:file "implementation")
              (:file "include")
              (:file "reader")))

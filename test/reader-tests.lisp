@@ -54,24 +54,27 @@ bar"))
   "void foo(int a, int b) {
 a + b;
 }"
-  (vacietis::c-fun foo (a b) ()
-    (+ a b)))
+  (cl:defun foo (a b)
+    (cl:prog* ()
+       (+ a b))))
 
 (reader-test function0
   "int max(int a, int b)
 {
 return a > b ? a : b;
 }"
-  (vacietis::c-fun max (a b) ()
-    (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b))))
+  (cl:defun max (a b)
+    (cl:prog* ()
+       (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b)))))
 
 (reader-test function1
   "extern int max(int a, int b)
 {
 return a > b ? a : b;
 }"
-  (vacietis::c-fun max (a b) ()
-    (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b))))
+  (cl:defun max (a b)
+    (cl:prog* ()
+       (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b)))))
 
 ;;; function calls
 
@@ -144,23 +147,23 @@ return a > b ? a : b;
 
 (reader-test inc1
   "++a;"
-  (++ a))
+  (= a (+ a 1)))
 
 (reader-test inc2
   "a++;"
-  (post++ a))
+  (cl:prog1 a (= a (+ a 1))))
 
 (reader-test dec1
   "--a;"
-  (-- a))
+  (= a (- a 1)))
 
 (reader-test dec2
   "a--;"
-  (post-- a))
+  (cl:prog1 a (= a (- a 1))))
 
 (reader-test dec3
   "--foo;"
-  (-- foo))
+  (= foo (- foo 1)))
 
 (reader-test op-precedence1
   "a + b + c;"
@@ -333,21 +336,23 @@ return a > b ? a : b;
 
 (reader-test deref-increment
   "*x++;"
-  (deref* (post++ x)))
+  (deref* (cl:prog1 x (= x (+ x 1)))))
 
 (reader-test no-arg-function
   "void foo() {
 a + b;
 }"
-  (vacietis::c-fun foo () ()
-    (+ a b)))
+  (cl:defun foo ()
+    (cl:prog* ()
+       (+ a b))))
 
 (reader-test labeled-statement1
   "void foo() {
 baz: a + b;
 }"
-  (vacietis::c-fun foo () ()
-    baz (+ a b)))
+  (cl:defun foo ()
+    (cl:prog* ()
+     baz (+ a b))))
 
 (reader-test sizeof-something
   "int lispobj[20];
@@ -369,16 +374,18 @@ result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
   "void main () {
 int x;
 }"
-  (vacietis::c-fun main () ((x 0))
-    ))
+  (cl:defun main ()
+    (cl:prog* ((x 0))))
+  )
 
 (reader-test function-comments0
   "void main () {
 /* this is a comment */
 int x;
 }"
-  (vacietis::c-fun main () ((x 0))
-    ))
+  (cl:defun main ()
+    (cl:prog* ((x 0))))
+  )
 
 (reader-test function-comments1
   "void main () {
@@ -386,8 +393,9 @@ int x;
 int x;
 // this is another comment
 }"
-  (vacietis::c-fun main () ((x 0))
-    ))
+  (cl:defun main ()
+    (cl:prog* ((x 0))))
+  )
 
 (reader-test while0
   "while (fahr <= upper) {
@@ -411,9 +419,11 @@ fahr = fahr + step;
 printf(\"hello, world\\n\");
 }
 "
-  (vacietis::c-fun main () ()
-    (printf "hello, world
+  (cl:defun main ()
+    (cl:prog* ()
+       (printf "hello, world
 ")))
+  )
 
 (reader-test k&r-pg12
   "void main()
@@ -434,16 +444,17 @@ fahr = fahr + step;
 }
 }
 "
-  (vacietis::c-fun main () ((step 0) (upper 0) (lower 0) (celsius 0) (fahr 0))
-    (= lower 0)
-    (= upper 300)
-    (= step 20)
-    (= fahr lower)
-    (for (cl:nil cl:nil (<= fahr upper) cl:nil)
-      (cl:tagbody
-         (= celsius (* 5 (/ (- fahr 32) 9)))
-         (printf "%dt%dn" fahr celsius)
-         (= fahr (+ fahr step))))))
+  (cl:defun main ()
+    (cl:prog* ((step 0) (upper 0) (lower 0) (celsius 0) (fahr 0))
+       (= lower 0)
+       (= upper 300)
+       (= step 20)
+       (= fahr lower)
+       (for (cl:nil cl:nil (<= fahr upper) cl:nil)
+            (cl:tagbody
+               (= celsius (* 5 (/ (- fahr 32) 9)))
+               (printf "%dt%dn" fahr celsius)
+               (= fahr (+ fahr step)))))))
 
 (reader-test k&r-pg16
   "void main()
@@ -453,21 +464,25 @@ for (fahr = 0; fahr <= 300; fahr = fahr + 20)
 printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
 }
 "
-  (vacietis::c-fun main () ((fahr 0))
-    (for (() (= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
-      (printf "%3d %6.1f
+  (cl:defun main ()
+    (cl:prog* ((fahr 0))
+       (for (() (= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
+            (printf "%3d %6.1f
 "
-                 fahr (* (/ 5.0 9.0) (- fahr 32))))))
+                    fahr (* (/ 5.0 9.0) (- fahr 32)))))))
 
 (reader-test c99-style-for-init
   "for (int x = 0; x < 10; x++)
 x++;"
-  (for (((x 0)) (cl:progn (= x 0)) (< x 10) (post++ x))
-    (post++ x)))
+  (for (((x 0)) (cl:progn (= x 0)) (< x 10) (cl:prog1 x (= x (+ x 1))))
+    (cl:prog1 x (= x (+ x 1)))))
 
 (reader-test c99-style-for1
   "for (int x = 0; x < 10; x++) foobar += x;"
-  (for (((x 0)) (cl:progn (= x 0)) (< x 10) (post++ x))
+  (for (((x 0))
+        (cl:progn (= x 0))
+        (< x 10)
+        (cl:prog1 x (= x (+ x 1))))
     (+= foobar x)))
 
 (reader-test k&r-pg18
@@ -481,10 +496,11 @@ while (c != EOF) {
 }
 }
 "
-  (vacietis::c-fun main () ((c 0))
-    (= c (getchar))
-    (vacietis.c:for (cl:nil cl:nil (!= c EOF) cl:nil)
-      (cl:tagbody (putchar c) (= c (getchar))))))
+  (cl:defun main ()
+    (cl:prog* ((c 0))
+       (= c (getchar))
+       (for (cl:nil cl:nil (!= c EOF) cl:nil)
+            (cl:tagbody (putchar c) (= c (getchar)))))))
 
 (reader-test var-declare-and-initialize0
   "int x = 1;"
@@ -505,33 +521,43 @@ while (c != EOF) {
     }
     return result;
 }"
-  (vacietis::c-fun pow (base exponent) ((result 0))
-    (cl:progn (= result 1))
-    (for (cl:nil cl:nil (> exponent 0) cl:nil)
-      (cl:tagbody
-         (cl:if (cl:eql 0 (% exponent 2))
-                cl:nil
-                (*= result base))
-         (*= base base)
-         (/= exponent 2)))
-    (cl:return result)))
+  (cl:defun pow (base exponent)
+    (cl:prog*
+        ((result 0))
+       (cl:progn (= result 1))
+       (for (cl:nil cl:nil (> exponent 0) cl:nil)
+            (cl:tagbody
+               (cl:if (cl:eql 0 (% exponent 2))
+                      cl:nil
+                      (*= result base))
+               (*= base base)
+               (/= exponent 2)))
+       (cl:return result))))
 
 (reader-test empty-label
   "int main () { end:; }"
-  (vacietis::c-fun main () ()
-    end
-    cl:nil))
+  (cl:defun main ()
+    (cl:prog* ()
+     end
+     cl:nil)))
 
 (reader-test h&s-while2
   "while ( *char_pointer++ );"
-  (for (cl:nil cl:nil (deref* (post++ char_pointer)) cl:nil)
+  (for (cl:nil
+        cl:nil
+        (deref* (cl:prog1 char_pointer
+                  (= char_pointer (+ char_pointer 1))))
+        cl:nil)
     cl:nil))
 
 (reader-test h&s-while3
   "while ( *dest_pointer++ = *source_pointer++ );"
   (for (cl:nil
         cl:nil
-        (= (deref* (post++ dest_pointer)) (deref* (post++ source_pointer)))
+        (= (deref* (cl:prog1 dest_pointer
+                     (= dest_pointer (+ dest_pointer 1))))
+           (deref* (cl:prog1 source_pointer
+                     (= source_pointer (+ source_pointer 1)))))
         cl:nil)
     cl:nil))
 
@@ -674,10 +700,19 @@ while (c != EOF) {
 static short s;
 auto short *sp = &s + 3, *msp = &s - 3;
 }"
-  (vacietis::c-fun main () ((msp 0) (sp 0) (s 0))
-    (cl:progn
-      (= sp (+ (mkptr& s) 3))
-      (= msp (- (mkptr& s) 3)))))
+  (cl:defun main ()
+    (cl:prog* ((msp 0) (sp 0) (s 0))
+       (cl:progn
+         (= sp (+ (mkptr& s) 3))
+         (= msp (- (mkptr& s) 3))))))
+
+(reader-test deref-op-precedence
+  "&p + 1;"
+  (+ (mkptr& p) 1))
+
+(reader-test mkptr-increment
+  "&p++;"
+  (mkptr& (cl:prog1 p (= p (+ p 1)))))
 
 (reader-test preprocessor-define-template-noargs
   "#define getchar()  getc(stdin)
@@ -706,9 +741,53 @@ double imag;
 {
    return 2;
 }"
-  (vacietis::c-fun strrchr (* s c)
-      cl:nil
-    (cl:return 2)))
+  (cl:defun strrchr (s c)
+    (cl:prog* cl:nil
+       (cl:return 2))))
+
+(reader-test deref-exp
+  "*(foo + 1)"
+  (deref* (+ foo 1)))
+
+(reader-test deref-exp1
+  "*(s += strspn(s, s2))"
+  (deref* (+= s (strspn s s2))))
+
+(reader-test negative-number
+  "-1;"
+  (cl:- 1))
+
+(reader-test negative-exp
+  "-(a * b);"
+  (cl:- (* a b)))
+
+(reader-test not-funcall
+  "!foo()"
+  (! (foo)))
+
+(reader-test not-deref
+  "!*p"
+  (! (deref* p)))
+
+(reader-test notnot
+  "!!p"
+  (! (! p)))
+
+(reader-test notnotnot
+  "!!!p"
+  (! (! (! p))))
+
+(reader-test notnotnotnot
+  "!!!!p"
+  (! (! (! (! p)))))
+
+(reader-test two-deref
+  "**p"
+  (deref* (deref* p)))
+
+(reader-test parenthezation
+  "(2+3) * 6;"
+  (* (+ 2 3) 6))
 
 ;; (reader-test function-returning-pointer-to-int
 ;;   "int *foo();"

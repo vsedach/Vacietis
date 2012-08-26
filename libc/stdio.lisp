@@ -239,11 +239,211 @@
 
 ;;; printf
 
-(defun printf (fmt &rest args)
-  (apply #'fprintf stdout fmt args))
+;; adapted from ZetaC
+(defun zclib>read-decimal-from-string (str idx)
+  "Reads a decimal value out of a string, stopping at the first
+   non-digit. Returns the value read and the next index in the
+   string."
+  (let ((positive (case (code-char (aref str idx))
+                    (#\+ (incf idx) t)
+                    (#\- (incf idx) nil)
+                    (t t))))
+    (do ((ch (aref str idx) (aref str (incf idx)))
+         (val 0 (+ (* val 10.) (- ch (char-code #\0)))))
+        ((not (and (>= ch (char-code #\0)) (<= ch (char-code #\9))))
+         (values (if positive val (- val)) idx)))))
+
+(defun zclib>print-integer (val width precision pad-char right-justify?
+			    alternate-form? uppercase-hex? always+- spacep pbase
+			    stream)
+  (unless (and (zerop val) (zerop precision))	; If PRECISION=0, don't print '0'
+    (let* ((sign       (cond ((minusp val) (setf val (- val)) "-")
+                             (always+-                        "+")
+                             (spacep                          " ")
+                             (t                                "")))
+	   (buffer     (format nil "~A~VR"
+                               (cond ((and alternate-form? (= pbase 8))
+                                      "0")
+                                     ((and alternate-form? (= pbase 16))
+                                      (if uppercase-hex? "0X" "0x"))
+                                     (t ""))
+                               pbase val))
+	   (val-len    (+ (length buffer) (length sign)))
+	   (leading-0s (max 0 (- precision val-len))))
+      (unless uppercase-hex?
+        (string-downcase buffer))
+      (when right-justify?
+	(loop repeat (- width (+ val-len leading-0s))
+              do (write-char pad-char stream)))
+      (write-string sign stream)
+      (loop repeat leading-0s			; This is how ANSI says to do this
+            do (write-char #\0 stream))
+      (write-string buffer stream)
+      (unless right-justify?
+	(loop repeat (- width (+ val-len leading-0s))
+              do (write-char pad-char stream))))))
+
+(defun zclib>print-flonum-1 (val precision alternate-form? uppercase-E-format?
+			     e-format)
+  "Returns the printed flonum as a string. VAL is assumed to be non-negative."
+  (if (or (eql e-format #\e)		; We must go to Exx format.
+          (and (eql e-format #\g)
+               ;; PRECISION tells %g when to use Exx format.
+               (or (> val (expt 10 (1+ precision)))
+                   (< val 1.0e-4))))
+      (format nil
+              (format nil "~~,~d,2,,,,'~cE"
+                      precision (if uppercase-E-format? #\E #\e))
+              val)
+      (format nil (format nil "~~,~dF" precision) val)))
+
+(defun zclib>print-flonum (val width precision pad-char right-justify?
+			   alternate-form? uppercase-E-format? always+- spacep
+			   conv-char stream)
+  "CONV-CHAR should be one of #\e, #\f, #\g"
+  (let* ((negative? (minusp val))
+         (val       (if negative?  (- val) val))
+	 (buffer    (zclib>print-flonum-1 val precision alternate-form?
+                                          uppercase-E-format? conv-char))
+         (val-len   (+ (length buffer)
+                       (if (or negative? always+- spacep) 1 0))))
+    (when right-justify?
+      (loop repeat (- width val-len)
+            do (write-char pad-char stream)))
+    (cond (negative? (write-char #\-     stream))
+	  (always+-  (write-char #\+     stream))
+	  (spacep    (write-char #\Space stream)))
+    (write-string buffer stream)
+    (unless right-justify?
+      (loop repeat (- width val-len)
+            do (write-char pad-char stream)))))
 
 (defun fprintf (fd fmt &rest args)
-  )
+  "Prints ARGS to FD according to FMT.
+   Characters in FMT are just copied to the output, except for %, which introduces
+   a directive.  A directive has the following syntax:
+     %[-][0][<width>][.<precision>][l]<conv>
+   <conv> can be one of the following:
+     d o x     The integer <arg> is printed in decimal, octal, or hex respectively.
+     f         The float or double <arg> is printed in the style `[-]ddd.ddd' with
+               <precision> digits after the decimal point (default 6).
+     e	       The float or double <arg> is printed in the style `[-]d.ddddde[-]dd'
+               with <precision> digits after the decimal point (default 6).
+     g         The float or double <arg> is printed in f or e style, as appropriate
+               for its magnitude.
+     s	       The string <arg> is printed; if <precision> is specified, it is the
+	       maximum number of characters to print.
+     c	       The character <arg> is printed.  NULs are ignored.
+   If a minus sign appears before <width>, the value is left justified in the
+   field; if a zero appears before <width>, padding will be done with zeros instead
+   of blanks.  An `l' before <conv> is ignored, as is the case of <conv>."
+  (let ((fmt-array (memptr-mem fmt))
+        (stream    (fd-stream fd)))
+    (do ((fmt-index (memptr-ptr fmt) (1+ fmt-index)))
+        ((= (aref fmt-array fmt-index) 0) 0)
+      (let ((ch (aref fmt-array fmt-index)))
+        (if (eql ch (char-code #\%))
+            (let ((next-idx (incf fmt-index))
+                  right-justify pad-char always+- space-flag alternate-form
+                  width precision uppercase)
+
+              ;; First we look for flags, assuming their order if present
+              (if (= (char-code #\-) (aref fmt-array next-idx))
+                  (incf next-idx)         ; Skip '-'
+                  (setf right-justify t))
+             (if (= (char-code #\0) (aref fmt-array next-idx))
+                 ;; Here is where UNIX and H&S expect the '0' flag. See ** below.
+                 (progn (setq pad-char #\0) (incf next-idx)) ; Skip '0'
+                 (setq pad-char #\Space))
+             (when (= (char-code #\+) (aref fmt-array next-idx))
+               (setf always+- t) (incf next-idx)) ; Skip '+'
+             (when (= (char-code #\Space) (aref fmt-array next-idx))
+               (setf space-flag #\Space) (incf next-idx)) ; Skip ' '
+             (when (= (char-code #\#) (aref fmt-array next-idx))
+               (setf alternate-form t) (incf next-idx))	; Skip '#'
+
+             ;; Get width, if present
+             (if (= (char-code #\*) (aref fmt-array next-idx))
+                 (progn
+                   (incf next-idx)          ; Skip over the '*'
+                   (setq width (pop args))) ; Consume an arg for the width
+                 (progn
+                   (when (= (char-code #\0) (aref fmt-array next-idx))
+                     ;; Here is where ANSI expects the '0' flag. See ** above.
+                     (incf next-idx) (setq pad-char #\0)) ; Skip '0'
+                   (multiple-value-setq (width next-idx)
+                     ;; If width is absent, 0 is 1st value returned
+                     (zclib>read-decimal-from-string fmt-array next-idx))))
+
+             (when (minusp width)
+               (setf right-justify nil ; Per ANSI spec
+                     width         (abs width)))
+
+             ;; Get precision, if present
+             (when (= (char-code #\.) (aref fmt-array next-idx))
+               (incf next-idx)          ; Skip over '.'
+               (if (= (char-code #\*) (aref fmt-array next-idx))
+                   (progn
+                     (incf next-idx)              ; Skip over '*'
+                     (setf precision (pop args))) ; get arg for the precision
+                   (multiple-value-setq (precision next-idx)
+                     ;; If width is absent, 0 is 1st value returned
+                     (zclib>read-decimal-from-string fmt-array next-idx))))
+
+             (when (and precision (minusp precision))
+               (setf precision nil))    ; Per ANSI spec
+             (when (find (code-char (aref fmt-array next-idx)) "lLh")
+               (incf next-idx))         ; Discard long/short info
+
+             (let ((char (code-char (aref fmt-array next-idx))))
+               (setf fmt-index next-idx)
+
+               (when (upper-case-p char)
+                 (setq uppercase t
+                       ;; No int/long distinction - let uppercase %D, %U, etc. thru
+                       char      (char-downcase char)))
+
+               (case char
+                 ((#\d #\i #\o #\x #\u)
+                  (assert (integerp (car args)))
+                  (zclib>print-integer (pop args)
+                                       (or width 0)
+                                       (or precision 1)
+                                       pad-char
+                                       right-justify
+                                       alternate-form
+                                       uppercase
+                                       always+-
+                                       space-flag
+                                       (case char
+                                         ((#\d #\i #\u) 10)
+                                         (#\o            8)
+                                         (#\x           16))
+                                       stream))
+                 ((#\e #\f #\g)
+                  (assert (floatp (car args)))
+                  (zclib>print-flonum (pop args) (or width 0) (or precision 6)
+                                      pad-char right-justify alternate-form
+                                      uppercase always+- space-flag ch stream))
+                 (#\c
+                  (unless (zerop (car args))
+                    (write-char (code-char (pop args)) stream)))
+                 (#\s
+                  (let* ((string (pop args))
+                         (length (min (or precision most-positive-fixnum)
+                                      (vacietis.libc.string.h:strlen string))))
+                    (loop repeat (- width length)
+                          do (write-char pad-char stream))
+                    (let ((str (memptr-mem string)))
+                      (dotimes (i length)
+                        (write-char (code-char (aref str (+ start i)))
+                                    stream)))))
+                 (otherwise
+                  (write-char char stream)))))
+            (write-char (code-char ch) stream))))))
+
+(defun printf (fmt &rest args)
+  (apply #'fprintf stdout fmt args))
 
 (defun sprintf (str fmt &rest args)
   (replace
@@ -254,7 +454,8 @@
        (apply #'fprintf (make-instance 'FILE :stream out) fmt args))))
    :start1 (memptr-ptr str)))
 
-(defun snprintf (string max-length fmt &rest args))
+(defun snprintf (string max-length fmt &rest args)
+  (error "NOT IMPLEMENTED YET"))
 
 (defun perror (str)
   (if (or (eql NULL str)

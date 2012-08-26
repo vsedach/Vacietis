@@ -98,7 +98,27 @@
 
 (deflibcpkg #:vacietis.libc.string.h
   (:export
-   #:strerror))
+   #:strerror
+   #:strrchr
+   #:strspn
+   #:strpbrk
+   #:strstr
+   #:strtok
+   #:strtok_r
+   #:strcpy
+   #:strncpy
+   #:strcat
+   #:strncat
+   #:strchr
+   #:strcmp
+   #:strncmp
+   #:strlen
+   #:strcspn
+   #:memcpy
+   #:memmove
+   #:memset
+   #:memchr
+   #:memcmp))
 
 (deflibcpkg #:vacietis.libc.stdio.h
   (:shadow #:remove)
@@ -123,6 +143,8 @@
    #:setvbuf
    #:fgetc
    #:fputc
+   #:putc
+   #:putchar
    #:fgets
    #:gets
    #:fputs

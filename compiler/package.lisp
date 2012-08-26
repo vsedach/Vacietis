@@ -6,11 +6,11 @@
    #:vacietis
    #:c-readtable
    #:string-to-char*
-   #:*c-structs*
    #:*basic-c-types*
    #:*type-qualifiers*
-   #:*variable-types*
-   #:variable-info
+   #:*c-structs*
+   #:*variable-sizes*
+   #:variable-size
    #:literal
 
    ;; memory stuff
@@ -81,6 +81,7 @@
    #:|.|
    #:?
    #:|:|
+   #:|,|
 
    ;; keywords
    #:auto

@@ -6,25 +6,25 @@
 (in-package #:vacietis.c)
 
 (cl:defparameter vacietis.reader::*ops*
-  '(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / % ! ~ -> |.|))
+  #(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / % ! ~ -> |.| |,|))
 
-(cl:defparameter vacietis.reader::*prefix-ops* '(++ -- ~ ! - + & *))
+(cl:defparameter vacietis.reader::*possible-prefix-ops*
+  #(! ~ sizeof - + & * ++ --))
 
-(cl:defparameter vacietis.reader::*unambiguous-prefix-ops* '(++ -- ! ~))
-
-(cl:defparameter vacietis.reader::*assignment-ops* '(= += -= *= /= %= <<= >>= &= ^= |\|=|))
+(cl:defparameter vacietis.reader::*assignment-ops*
+  #(= += -= *= /= %= <<= >>= &= ^= |\|=|))
 
 (cl:defparameter vacietis.reader::*binary-ops-table*
-  '(|\|\|| ; or
-    &&     ; and
-    |\||   ; logior
-    ^      ; logxor
-    &      ; logand
-    == !=
-    < > <= >=
-    << >>  ; ash
-    + -
-    * / %))
+  #((|\|\||)                            ; or
+    (&&)                                ; and
+    (|\||)                              ; logior
+    (^)                                 ; logxor
+    (&)                                 ; logand
+    (== !=)
+    (< > <= >=)
+    (<< >>)                             ; ash
+    (+ -)
+    (* / %)))
 
 (cl:in-package #:vacietis.reader)
 
@@ -32,6 +32,7 @@
 
 (defvar %in)
 (defvar *current-file* nil)
+(defvar *line-number*)
 
 ;;; error reporting
 
@@ -50,8 +51,6 @@
 
 ;;; basic stream stuff
 
-(defvar *line-number* 1)
-
 (defun c-read-char ()
   (let ((c (read-char %in nil)))
     (when (eql c #\Newline)
@@ -67,8 +66,21 @@
   `(loop with c do (setf c (c-read-char))
         ,@body))
 
+(defun next-char (&optional (eof-error? t))
+  "Returns the next character, skipping over whitespace and comments"
+  (loop-reading
+     while (case c
+             ((nil)                     (when eof-error?
+                                          (read-error "Unexpected end of file")))
+             (#\/                       (%maybe-read-comment))
+             ((#\Space #\Newline #\Tab) t))
+     finally (return c)))
+
+(defun make-buffer (&optional (element-type t))
+  (make-array 10 :adjustable t :fill-pointer 0 :element-type element-type))
+
 (defun slurp-while (predicate)
-  (let ((string-buffer (make-string-buffer)))
+  (let ((string-buffer (make-buffer 'character)))
     (loop-reading
        while (and c (funcall predicate c))
        do (vector-push-extend c string-buffer)
@@ -90,19 +102,6 @@
   (declare (ignore slash))
   (%maybe-read-comment)
   (values))
-
-(defun next-char (&optional (eof-error? t))
-  "Returns the next character, skipping over whitespace and comments"
-  (loop-reading
-     while (case c
-             ((nil)                     (when eof-error?
-                                          (read-error "Unexpected end of file")))
-             (#\/                       (%maybe-read-comment))
-             ((#\Space #\Newline #\Tab) t))
-     finally (return c)))
-
-(defun make-string-buffer ()
-  (make-array '(3) :adjustable t :fill-pointer 0 :element-type 'character))
 
 ;;; numbers
 
@@ -174,7 +173,7 @@
 
 (defun read-c-string (c1)
   (declare (ignore c1))
-  (let ((string (make-string-buffer)))
+  (let ((string (make-buffer 'character)))
     (loop-reading
        (if (char= c #\") ;; c requires concatenation of adjacent string literals, retardo
            (progn (setf c (next-char nil))
@@ -250,7 +249,7 @@
 (defun c-read-delimited-strings (&optional skip-spaces?)
   (next-char) ;; skip opening paren
   (let ((paren-depth 0)
-        (acc ()))
+        (acc (make-buffer)))
     (with-output-to-string (sink)
       (loop for c = (c-read-char)
             until (and (= paren-depth 0) (eql #\) c)) do
@@ -258,12 +257,12 @@
               (#\Space (unless skip-spaces? (princ c sink)))
               (#\( (incf paren-depth) (princ c sink))
               (#\) (decf paren-depth) (princ c sink))
-              (#\, (push (get-output-stream-string sink) acc))
+              (#\, (vector-push-extend (get-output-stream-string sink) acc))
               (otherwise (princ c sink)))
             finally (let ((last (get-output-stream-string sink)))
                       (unless (string= last "")
-                        (push last acc)))))
-    (reverse acc)))
+                        (vector-push-extend last acc)))))
+    (map 'list #'identity acc)))
 
 (defun read-c-macro (%in sharp)
   (declare (ignore sharp))
@@ -330,64 +329,102 @@
 
 ;;; infix
 
-(defun parse-nary (args)
-  (flet ((split-recurse (x)
-           (list (elt args x)
-                 (parse-infix (subseq args 0 x))
-                 (parse-infix (subseq args (1+ x))))))
-    (acond ((and (consp (car args))
-                 (consp (caar args))
-                 (some #'c-type? (caar args)))
-            (parse-nary (cdr args))) ;; ignore casts
-           ((position-if (lambda (x) (member x *assignment-ops*)) args)
-            (split-recurse it))
-           ((position 'vacietis.c:? args)
+(defun parse-infix (exp &optional (start 0) (end (when (vectorp exp) (length exp))))
+  (if (vectorp exp)
+      (block nil
+        (when (= 0 (length exp))
+          (return))
+        (when (= 1 (- end start))
+          (return (parse-infix (aref exp start))))
+        (labels ((cast? (x)
+                   (and (vectorp x) (some #'c-type? x)))
+                 (match-binary-ops (table)
+                   (position-if (lambda (x) (find x table))
+                                exp :start (1+ start) :end (1- end)))
+                 (parse-binary (i &optional op)
+                   (list (or op (aref exp i))
+                         (parse-infix exp start  i)
+                         (parse-infix exp (1+ i) end))))
+          ;; in order of weakest to strongest precedence
+          ;; comma
+          (awhen (match-binary-ops '(vacietis.c:|,|))
+            (return (parse-binary it 'progn)))
+          ;; assignment
+          (awhen (match-binary-ops *assignment-ops*)
+            (return (parse-binary it)))
+          ;; elvis
+          (awhen (position 'vacietis.c:? exp :start start :end end)
             (let ((?pos it))
-              `(if (not (eql 0 ,(parse-infix (subseq args 0 ?pos))))
-                   ,@(aif (position 'vacietis.c:|:| args)
-                          (list (parse-infix (subseq args (1+ ?pos) it))
-                                (parse-infix (subseq args (1+ it))))
-                          (read-error "Error parsing ?: trinary operator in: ~A"
-                                      args)))))
-           ((loop for op in *binary-ops-table*
-                  thereis (position op args :start 1))
-            (split-recurse it))
-           ((find (first args) *prefix-ops*)
-            (if (= 3 (length args))
-                (parse-unary (first args)
-                             (parse-unary (second args) (third args)))
-                (read-error "Error parsing expression: ~A" args)))
-           (t args)))) ;; assume arglist
-
-(defun parse-unary (a b)
-  (acond ((find a *unambiguous-prefix-ops*)
-          (list it b))
-         ((and (listp a) (listp (car a)) (some #'c-type? (car a)))
-          (parse-infix b)) ;; looks like a cast, ignore it
-         (t (case a
-              (vacietis.c:* `(vacietis.c:deref* ,b))
-              (vacietis.c:& `(vacietis.c:mkptr& ,b))
-              (vacietis.c:sizeof
-               (when (listp b) (setf b (car b)))
-               (when (listp b) (setf b (car b))) ;; fixme for complex stuff
-               (or (cond ((member b *basic-c-types*) 1)
-                         (t (variable-info b)))
-                   (read-error "Don't know sizeof ~A" b)))
-              (t (case b
-                   (vacietis.c:++ `(vacietis.c:post++ ,a))
-                   (vacietis.c:-- `(vacietis.c:post-- ,a))
-                   (t (cond ((eq 'vacietis.c:[] (car b))
-                             `(vacietis.c:[] ,a ,(cadr b)))
-                            (t ;; assume funcall
-                             `(,a ,@(mapcar #'parse-infix b)))))))))))
-
-(defun parse-infix (args)
-  (if (consp args)
-      (case (length args)
-        (1 (parse-infix (car args)))
-        (2 (parse-unary (first args) (second args)))
-        (t (parse-nary args)))
-      args))
+              (return
+                `(if (not (eql 0 ,(parse-infix exp start ?pos)))
+                     ,@(aif (position 'vacietis.c:|:| exp :start ?pos :end end)
+                            (list (parse-infix exp (1+ ?pos) it)
+                                  (parse-infix exp (1+ it)   end))
+                            (read-error "Error parsing ?: trinary operator in: ~A"
+                                        (subseq exp start end)))))))
+          ;; various binary operators
+          (loop for table across *binary-ops-table* do
+               (awhen (match-binary-ops table)
+                 (let ((prev (aref exp (1- it))))
+                   (unless (or (cast? prev)
+                               (find prev *possible-prefix-ops*))
+                     (return-from parse-infix (parse-binary it))))))
+          ;; unary operators
+          (flet ((parse-rest (i)
+                   (parse-infix exp (1+ i) end)))
+            (loop for i from start below end for x = (aref exp i) do
+                 (cond ((cast? x)                               ;; cast
+                        (return-from parse-infix (parse-rest i)))
+                       ((find x #(vacietis.c:++ vacietis.c:--)) ;; inc/dec
+                        (return-from parse-infix
+                          (let* ((postfix? (< start i))
+                                 (place    (if postfix?
+                                               (parse-infix exp start  i)
+                                               (parse-infix exp (1+ i) end)))
+                                 (set-exp `(vacietis.c:=
+                                            ,place
+                                            (,(if (eq x 'vacietis.c:++)
+                                                  'vacietis.c:+
+                                                  'vacietis.c:-)
+                                              ,place 1))))
+                            (if postfix?
+                                `(prog1 ,place ,set-exp)
+                                set-exp))))
+                       ((find x *possible-prefix-ops*)          ;; prefix op
+                        (return-from parse-infix
+                          (if (eq x 'vacietis.c:sizeof)
+                              (let ((type-exp (aref exp (1+ i))))
+                                (when (vectorp type-exp) ;; fixme
+                                  (setf type-exp (aref type-exp 0)))
+                                (or (size-of type-exp)
+                                    (read-error "Don't know sizeof ~A" type-exp)))
+                              (list (case x
+                                      (vacietis.c:- '-)
+                                      (vacietis.c:* 'vacietis.c:deref*)
+                                      (vacietis.c:& 'vacietis.c:mkptr&)
+                                      (otherwise     x))
+                                    (parse-rest i))))))))
+          ;; funcall, aref, and struct access
+          (loop for i from (1+ start) below end for x = (aref exp i) do
+               (cond
+                 ((find x #(vacietis.c:|.| vacietis.c:->))
+                  (return-from parse-infix (parse-binary i)))
+                 ((listp x) ;; aref
+                  (return-from parse-infix
+                    (if (eq (car x) 'vacietis.c:[])
+                        `(vacietis.c:[] ,(parse-infix exp start i)
+                                        ,(parse-infix (second x)))
+                        (read-error "Unexpected list when parsing ~A" exp))))
+                 ((vectorp x) ;; funcall
+                  (return-from parse-infix
+                    (cons (parse-infix exp start i)
+                          (loop with xstart = 0
+                             for next = (position 'vacietis.c:|,| x :start xstart)
+                             when (< 0 (length x))
+                             collect (parse-infix x xstart (or next (length x)))
+                             while next do (setf xstart (1+ next))))))))
+          (read-error "Error parsing expression: ~A" (subseq exp start end))))
+      exp))
 
 ;;; statements
 
@@ -415,6 +452,25 @@
   (read-c-exp (next-char)))
 
 (defvar *variable-declarations*)
+
+(defun read-exps-until (predicate)
+  (let ((exps (make-buffer)))
+    (loop for c = (next-char)
+          until (funcall predicate c)
+          do (vector-push-extend (read-c-exp c) exps))
+    exps))
+
+(defun c-read-delimited-list (open-delimiter separator)
+  (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\}) (#\; #\;)))
+        (list            (make-buffer))
+        done?)
+    (loop until done? do
+         (vector-push-extend
+          (read-exps-until (lambda (c)
+                             (cond ((eql c close-delimiter) (setf done? t))
+                                   ((eql c separator)       t))))
+          list))
+    list))
 
 (defun read-control-flow-statement (statement)
   (flet ((read-block-or-statement ()
@@ -452,64 +508,56 @@
                  (read-error "No 'while' following a 'do'"))))
           (vacietis.c:for
             `(vacietis.c:for
-                 ,(let* ((*variable-types*        (cons (make-hash-table)
-                                                        *variable-types*))
-                         (*variable-declarations* ())
+                 ,(let* ((*variable-sizes*        (cons (make-hash-table)
+                                                        *variable-sizes*))
+                         (*variable-declarations* ()) ;; c99, I think?
                          (initializations         (progn
                                                     (next-char)
                                                     (read-c-statement
                                                      (next-char)))))
                         (list* *variable-declarations*
                                initializations
-                               (mapcar #'parse-infix
-                                       (c-read-delimited-list #\( #\;))))
+                               (map 'list
+                                    #'parse-infix
+                                    (c-read-delimited-list #\( #\;))))
                ,(read-block-or-statement)))))))
 
-(defun c-read-delimited-list (open-delimiter separator)
-  (let ((close-delimiter (ecase open-delimiter (#\( #\)) (#\{ #\}) (#\; #\;)))
-        (acc ()))
-    (flet ((gather-acc ()
-             (prog1 (reverse acc) (setf acc ()))))
-      (append (loop for c = (next-char)
-                    until (eql c close-delimiter)
-                    if (eql separator c)
-                    collect (gather-acc)
-                    else do (push (read-c-exp c) acc))
-              (awhen (gather-acc) (list it))))))
-
 (defun read-function (name)
-  (let ((*variable-types* (cons (make-hash-table) *variable-types*)))
-   `(vacietis::c-fun ,name
-        ,(remove-if #'c-type? ;; do the right thing with type declarations
-                    (reduce #'append
-                            (c-read-delimited-list (next-char) #\,)))
-        ,@(let* ((*variable-declarations* ())
-                 (body (read-c-block (next-char))))
-            (cons *variable-declarations* body)))))
+  (let ((*variable-sizes* (cons (make-hash-table) *variable-sizes*)))
+   `(defun ,name
+        ,(loop for xs across (c-read-delimited-list (next-char) #\,) append
+              (loop for x across xs
+                    unless (or (c-type? x) (eql 'vacietis.c:* x))
+                    collect x))
+      ,(let* ((*variable-declarations* ())
+              (body (read-c-block (next-char))))
+        `(prog* ,*variable-declarations* ,@body)))))
 
 ;; fixme: shit code
 (defun process-variable-declaration (spec type)
   (let (name (preallocated-value 0) initial-value)
-    (labels ((parse-declaration (spec)
-               (if (symbolp spec)
-                   (setf name spec)
-                   (progn (case (car spec)
-                            (vacietis.c:= (setf initial-value (third spec)))
+    (labels ((parse-declaration (x)
+               (if (symbolp x)
+                   (setf name x)
+                   (progn (case (car x)
+                            (vacietis.c:= (setf initial-value (third x)))
                             (vacietis.c:[]
-                             (awhen (third spec)
+                             (awhen (third x)
                                (setf preallocated-value
                                      `(vacietis::allocate-memory ,it)))))
-                          (parse-declaration (second spec))))))
+                          (parse-declaration (second x))))))
       (parse-declaration spec)
-      (setf (gethash name (car *variable-types*))
-            (cond ((and (consp initial-value) (eql 'literal (car initial-value)))
-                   (length (second initial-value)))
+      (setf (gethash name (car *variable-sizes*))
+            (cond ((and (vectorp initial-value)
+                        (eq 'literal (car initial-value)))
+                   (length (elt initial-value 1)))
                   ((consp preallocated-value)
                    (second preallocated-value))
                   ((consp type) ;; assume struct
-                   (setf preallocated-value
-                         `(vacietis::allocate-memory ,(size-of type)))
-                   (size-of type))
+                   (let ((type-size (size-of (second type))))
+                     (setf preallocated-value
+                           `(vacietis::allocate-memory ,type-size))
+                     type-size))
                   (t 1)))
       (if (boundp '*variable-declarations*)
           (progn (push (list name preallocated-value) *variable-declarations*)
@@ -517,11 +565,13 @@
           `((defparameter ,name ,(or initial-value preallocated-value)))))))
 
 (defun read-variable-declaration (first-name type)
-  (let ((decls (c-read-delimited-list #\; #\,)))
-    (aif (mapcan (lambda (x)
-                   (process-variable-declaration (parse-infix x) type))
-                 (cons (cons first-name (car decls))
-                       (cdr decls)))
+  (let* ((decls (c-read-delimited-list #\; #\,))
+         (first (make-array (1+ (length (aref decls 0))))))
+    (replace first (aref decls 0) :start1 1)
+    (setf (aref first 0) first-name
+          (aref decls 0) first)
+    (aif (loop for x across decls appending
+              (process-variable-declaration (parse-infix x) type))
          (cons 'progn it)
          t)))
 
@@ -546,24 +596,22 @@
                     ,(read-variable-declaration (next-exp) `(struct ,name))))))
     declaration))
 
-(defun read-decl-prologue (type)
-  (let ((type (unless (type-qualifier? type) type))
-        (pointer? nil)
-        (name nil))
-    (loop for x = (next-exp) do
-         (cond ((eql 'vacietis.c:* x) (setf pointer? t))
-               ((basic-type? x)       (setf type x))
-               ((type-qualifier? x)   nil)
-               (t                     (setf name x) (return))))
-    (values name type pointer?)))
-
 (defun read-declaration (token)
   (when (c-type? token)
-    (multiple-value-bind (name type pointer?)
-        (read-decl-prologue token)
-      (cond ((eql #\( (peek-char t %in)) (read-function name))
-            ((eql type 'vacietis.c:struct) (read-struct name))
-            (t (read-variable-declaration name (unless pointer? type)))))))
+    (let ((type     (unless (type-qualifier? token) token))
+          (pointer? nil)
+          (name     nil))
+      (loop for x = (next-exp) do
+           (cond ((eql 'vacietis.c:* x) (setf pointer? t))
+                 ((basic-type? x)       (setf type x))
+                 ((type-qualifier? x)   nil)
+                 (t                     (setf name x) (return))))
+      (cond ((eql #\( (peek-char t %in))
+             (read-function name))
+            ((eql type 'vacietis.c:struct)
+             (read-struct name))
+            (t
+             (read-variable-declaration name (unless pointer? type)))))))
 
 (defun read-labeled-statement (token)
   (when (eql #\: (peek-char t %in))
@@ -571,10 +619,12 @@
     (values (read-c-statement (next-char)) token)))
 
 (defun read-infix-exp (next-token)
-  (parse-infix (cons next-token
-                     (loop for c = (next-char nil)
-                           until (or (eql c #\;) (null c))
-                           collect (read-c-exp c)))))
+  (let ((exp (make-buffer)))
+    (vector-push-extend next-token exp)
+    (loop for c = (next-char nil)
+          until (or (eql c #\;) (null c))
+          do (vector-push-extend (read-c-exp c) exp))
+    (parse-infix exp)))
 
 (defun %read-c-statement (token)
   (multiple-value-bind (statement label) (read-labeled-statement token)
@@ -638,11 +688,9 @@
             (t
              (case c
                (#\" (read-c-string c))
-               (#\( (c-read-delimited-list #\( #\,))
+               (#\( (read-exps-until (lambda (c) (eql #\) c))))
                (#\[ (list 'vacietis.c:[]
-                          (parse-infix (loop for c = (next-char)
-                                             until (eql c #\])
-                                             collect (read-c-exp c))))))))))
+                          (read-exps-until (lambda (c) (eql #\] c))))))))))
 
 ;;; readtable
 

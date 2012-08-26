@@ -34,7 +34,7 @@
 
 (def-unary-op vacietis.c:~ lognot)
 
-(defmacro sizeof (x)
+(defmacro sizeof (x) ;; this is not used anywhere, for now
   (cond ((intersection x vacietis.reader::*basic-c-types*) 1)
         ((typedef? x) (typedef-size x))
         (t (let ((var (gensym)))
@@ -84,6 +84,12 @@
   (etypecase ptr
     (memptr    (setf (aref (memptr-mem ptr) (memptr-ptr ptr)) new-value))
     (place-ptr (funcall (place-ptr-closure ptr) new-value))))
+
+(defun vacietis.c:[] (a i)
+  (aref (memptr-mem a) (+ (memptr-ptr a) i)))
+
+(defun (setf vacietis.c:[]) (new-value a i)
+  (setf (aref (memptr-mem a) (+ (memptr-ptr a) i)) new-value))
 
 ;;; arithmetic
 
@@ -168,15 +174,6 @@
 
 (unroll-assignment-ops += -= *= /= %= <<= >>= &= ^= |\|=|)
 
-(defmacro vacietis.c:++ (x)
-  `(vacietis.c:= ,x (vacietis.c:+ ,x 1)))
-(defmacro vacietis.c:-- (x)
-  `(vacietis.c:= ,x (vacietis.c:+ ,x 1)))
-(defmacro vacietis.c:post++ (x)
-  `(prog1 ,x (vacietis.c:++ ,x)))
-(defmacro vacietis.c:post-- (x)
-  `(prog1 ,x (vacietis.c:-- ,x)))
-
 ;;; iteration
 
 (defmacro vacietis.c:for ((bindings initialization test increment) body)
@@ -199,12 +196,6 @@
           (go break)
           (go loop))
     break))
-
-;;; declarations
-
-(defmacro c-fun (name arglist vars &body body)
-  `(defun ,name ,arglist
-     (prog* ,vars ,@body)))
 
 ;;; structs
 

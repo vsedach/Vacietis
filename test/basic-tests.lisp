@@ -143,6 +143,12 @@ do foo++; while (foo < 1);
 foo;"
   1)
 
+(eval-test setf-aref
+  "int foo[3];
+foo[0] = 123;
+foo[0];"
+  123)
+
 ;;; fixme: literals and '' single quoting
 ;; (eval-test sizeof-literal
 ;;   "sizeof('c');"

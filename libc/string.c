@@ -114,9 +114,9 @@ char *strcat (char *s1, char *s2) {
 char *strncat (char *s1, char *s2, int n) {
   char *s1tmp;
 
-  s1tmp = s1 + strlen (s1);	/* Remember where the original string ended */
+  s1tmp = s1 + strlen (s1);     /* Remember where the original string ended */
   strncpy (s1tmp, s2, n);       /* The real work happens here */
-  s1tmp[n] = NUL;	        /* Must guarantee that result ends in NUL */
+  s1tmp[n] = 0;	                /* Must guarantee that result ends in NUL */
   return s1;
 }
 
@@ -175,7 +175,7 @@ char *memcpy (char *dest, char *src, int nbytes) {
 }
 
 char *memmove (char *dest, char *src, int nbytes) {
-  void *tdest = destv;
+  void *tdest = dest;
 
   if (src > dest) while (nbytes-- > 0) *dest++ = *src++;
   else {
@@ -188,15 +188,15 @@ char *memmove (char *dest, char *src, int nbytes) {
 
 char *memset (char *dest, char c, int nbytes) {
   while (nbytes-- > 0) *dest++ = c;
-  return destv;
+  return dest;
 }
 
-void *memchr (char *sv, char c, int nbytes) {
+void *memchr (char *s, char c, int nbytes) {
   while (nbytes-- > 0) if (*s++ == c) return (void *)(s - 1);
   return (void *)NULL;
 }
 
-int memcmp (char *m1v, char *m2v, int nbytes) {
+int memcmp (char *m1, char *m2, int nbytes) {
   char c1, c2;
 
   while (nbytes-- > 0) {
