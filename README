@@ -9,36 +9,60 @@ calling convention for C functions and the CL package system for
 function and variable names, in essence treating the host CL runtime
 as a virtual machine.
 
+* TECHNICAL DETAILS:
+  -----------------
+
 Vacietis uses the memory model of Common Lisp as is, so sizeof of the
 primitive data types (char, int, float etc.) is all 1. This shouldn't
 be a problem for most C code, but some C programs claim to be portable
 while making assumptions that things can be cast into an array of
 chars to be manipulated. These programs won't work under Vacietis.
 
-Source code is available at https://github.com/vsedach/vacietis
 
-Portions of the Vacietis libc may be derived from Zeta-C.
+* OBTAINING CODE AND HELP:
+  -----------------------
 
-Vacietis is authored by Vladimir Sedach <vsedach@gmail.com>
+The official Vacietis repository is at:
+https://github.com/vsedach/vacietis
 
 There is a Vacietis mailing list on the web:
 http://groups.google.com/group/vacietis
 
+Bug reports can be sent to the mailing list
+(http://groups.google.com/group/vacietis), the github issue tracker
+(https://github.com/vsedach/vacietis), or directly to the author
+(vsedach@gmail.com)
+
+
+* TODO:
+  ----
+- struct accessors
+- enums
+- function pointers
+- libc stdio: scanf, binary streams
+- libc stddef: offsetof
+- libc signal
+- libc stdlib: div/ldiv, srand, exit cleanup
+- libc time
+- libc setjmp
+
+
+* THINGS THAT PROBABLY WON'T BE SUPPORTED:
+  ---------------------------------------
+- trying to cast arrays of chars to other types (mmap)
+- any kind of GCC extension
+
+
+* LICENSING INFORMATION
+  ---------------------
+
+Vacietis is authored by Vladimir Sedach <vsedach@gmail.com>; the
+latest copyright year is 2012.
+
 Vacietis is licensed under the LLGPL (see the file LICENSE included
 with the distribution for details).
 
-TODO:
-* struct accessors
-* enums
-* function pointers
-* libc stdio: printf/scanf, binary streams, error codes, fread/fwrite
-* libc stddef: offsetof
-* libc signal
-* libc stdlib: div/ldiv, srand, atof, strtod, strtol, exit cleanup
-* libc string
-* libc time
-* libc setjmp
-
-Things that probably won't be supported:
-* trying to cast arrays of chars to other types (mmap)
-* any kind of GCC extension
+Portions of the Vacietis libc may be derived from Zeta-C (released
+into the public domain by its author, Scott L. Burson) and Erik
+Andersen's LGPL-licensed <andersen@codepoet.org> uClibc
+(http://www.uclibc.org/)
