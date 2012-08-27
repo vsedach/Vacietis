@@ -140,6 +140,7 @@
    #:rename
    #:tmpfile
    #:tmpnam
+   #:setbuf
    #:setvbuf
    #:fgetc
    #:fputc
@@ -160,6 +161,9 @@
    #:rewind
    #:fgetpos
    #:fsetpos
+   #:fprintf
+   #:printf
+   #:sprintf
    ))
 
 (deflibcpkg #:vacietis.libc.stdlib.h

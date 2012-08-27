@@ -18,12 +18,13 @@
 
 (program-test different-comment-styles :return-code 9)
 
-(program-test hello-world0
-              :output "hello world")
+(program-test hello-world0 :output "hello world")
 
-(program-test inc-deref-associativity
-              :output "123")
+(program-test hello-world :output "hello world
+")
+
+(program-test inc-deref-associativity :output "123")
 
 ;; (program-test kr-echo :input "foobar" :output "foobar")
-;; (program-test hello-world :output "hello world")
+
 ;; (program-test hardward-ex3)
