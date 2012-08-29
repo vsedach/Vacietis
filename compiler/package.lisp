@@ -19,6 +19,7 @@
 
    ;; runtime
    #:*preprocessor-state*
+   #:make-pp-state
    #:load-c-file
    #:run-c-program
    ))

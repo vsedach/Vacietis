@@ -1,13 +1,38 @@
-Vacietis is a C to Common Lisp compiler inspired by the Zeta-C
-compiler for Lisp Machines
-(http://www.bitsavers.org/bits/TI/Explorer/zeta-c/) and TCC
-(http://bellard.org/tcc/).
+Vacietis is a C compiler for Common Lisp systems.
 
-The goal of Vacietis is to enable loading and running C code in a
-Common Lisp application. To this effect Vacietis uses the host CL
-calling convention for C functions and the CL package system for
-function and variable names, in essence treating the host CL runtime
-as a virtual machine.
+Vacietis works by loading C code into a Common Lisp runtime as though
+it were Lisp code, where it can then be compiled or evaled. The loaded
+C code has the same function calling convention as regular CL code and
+uses the same numerical representations. C memory is backed by regular
+Common Lisp arrays.
+
+Vacietis comes with a libc implemented in portable Common Lisp.
+
+
+* USAGE:
+  -----
+
+C code can be read in exactly like regular Lisp code by using
+readtables:
+
+(let ((*readtable* vacietis:c-readtable))
+  (read <some stream>))
+
+If the C code being read contains preprocessor directives, the
+preprocessor state (ie #defines) can be maintained (this is handy for
+constructing things like a C REPL, for example):
+
+(let ((*readtable*                   vacietis:c-readtable)
+      (vacietis:*preprocessor-state* (vacietis:make-pp-state)))
+  (read <some stream>))
+
+To simplify loading C files, a convenience function is provided that
+sets up the readtable, blank preprocessor state (which is the normal,
+per-file C behavior), and additional debugging information before
+calling LOAD:
+
+(vacietis:load-c-file "/foo/bar/file.c")
+
 
 * TECHNICAL DETAILS:
   -----------------
@@ -17,6 +42,13 @@ primitive data types (char, int, float etc.) is all 1. This shouldn't
 be a problem for most C code, but some C programs claim to be portable
 while making assumptions that things can be cast into an array of
 chars to be manipulated. These programs won't work under Vacietis.
+
+The basic idea for the Vacietis runtime and memory model comes from
+Scott L. Burson's Zeta-C compiler for Lisp Machines:
+http://www.bitsavers.org/bits/TI/Explorer/zeta-c/
+
+The idea for a combined single-pass preprocessor/tokenizer/parser
+comes from Patrice Bellard's TCC: http://bellard.org/tcc/
 
 
 * OBTAINING CODE AND HELP:
@@ -28,10 +60,12 @@ https://github.com/vsedach/vacietis
 There is a Vacietis mailing list on the web:
 http://groups.google.com/group/vacietis
 
-Bug reports can be sent to the mailing list
-(http://groups.google.com/group/vacietis), the github issue tracker
-(https://github.com/vsedach/vacietis), or directly to the author
-(vsedach@gmail.com)
+Bug reports can be sent to the mailing list:
+http://groups.google.com/group/vacietis
+the github issue tracker:
+https://github.com/vsedach/vacietis
+or directly to the author:
+vsedach@gmail.com
 
 
 * TODO:
@@ -64,5 +98,5 @@ with the distribution for details).
 
 Portions of the Vacietis libc may be derived from Zeta-C (released
 into the public domain by its author, Scott L. Burson) and Erik
-Andersen's LGPL-licensed <andersen@codepoet.org> uClibc
+Andersen's <andersen@codepoet.org> LGPL-licensed uClibc
 (http://www.uclibc.org/)

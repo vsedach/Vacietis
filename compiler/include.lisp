@@ -3,6 +3,9 @@
 
 (defvar *preprocessor-state* nil)
 
+(defun make-pp-state ()
+  (make-hash-table))
+
 (defun pp-defines (pkg)
   (intern "*PREPROCESSOR-DEFINES*" pkg))
 

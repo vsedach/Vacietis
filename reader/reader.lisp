@@ -731,19 +731,21 @@
          )))
   (def-c-readtable))
 
+(defvar c-readtable (find-readtable 'c-readtable))
+
 ;;; reader
 
 (defun cstr (str)
   (with-input-from-string (s str)
-    (let ((*preprocessor-state* (make-hash-table))
-          (*readtable*          (find-readtable 'c-readtable)))
+    (let ((*preprocessor-state* (make-pp-state))
+          (*readtable*          c-readtable))
       (cons 'progn (loop for it = (read s nil 'eof)
                          while (not (eq it 'eof)) collect it)))))
 
 (defun %load-c-file (*c-file* *preprocessor-state*)
-  (let ((*readtable*   (find-readtable 'c-readtable))
+  (let ((*readtable*   c-readtable)
         (*line-number* 1))
     (load *c-file*)))
 
 (defun vacietis:load-c-file (file)
-  (%load-c-file file (make-hash-table)))
+  (%load-c-file file (make-pp-state)))
