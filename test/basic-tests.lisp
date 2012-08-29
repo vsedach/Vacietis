@@ -31,13 +31,13 @@ foobar;"
 (eval-test string-literal
   "char foobar[] = \"foobar\";
 foobar;"
-  (string-to-char* "foobar"))
+  "foobar")
 
 (eval-test h&s-while-string-copy
   "char source_pointer[] = \"foobar\", dest_pointer[7];
 while ( *dest_pointer++ = *source_pointer++ );
 dest_pointer - 7;"
-  (string-to-char* "foobar"))
+  "foobar")
 
 (eval-test define-foo
   "#define FOO 1
@@ -153,6 +153,31 @@ foo[0];"
   "#include <string.h>
 strlen(\"foobar\");"
   6)
+
+(eval-test reverse
+  "void reverse(char *str) {
+  char * end = str;
+  char tmp;
+
+  if (str) {
+    while (*end) {
+      ++end;
+    }
+
+    --end;
+
+    while (str < end) {
+      tmp = *str;
+      *str++ = *end;
+      *end-- = tmp;
+    }
+  }
+}
+
+char *foo = \"foobar\";
+reverse(foo);
+foo;"
+  "raboof")
 
 ;;; fixme: literals and '' single quoting
 ;; (eval-test sizeof-literal

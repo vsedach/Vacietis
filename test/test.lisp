@@ -27,34 +27,42 @@
           (vacietis.reader::cstr ,input)
           '(progn ,@s-exps)))))
 
+(defun do-with-temp-c-package (name thunk)
+  (let ((test-package (make-package
+                       (gensym (format nil "VACIETIS.TEST.~A" name))
+                       :use '(#:vacietis.c))))
+    (unwind-protect
+         (let ((*package* test-package))
+           (funcall thunk))
+      (delete-package test-package))))
+
 (defmacro eval-test (name input result)
   `(test ,name
-     (is (equalp ,result (eval (vacietis.reader::cstr ,input))))))
+     (is (equalp ,(if (stringp result)
+                      `(string-to-char* ,result)
+                      result)
+                 (do-with-temp-c-package ',name
+                   (lambda ()
+                     (eval (vacietis.reader::cstr ,input))))))))
 
 (defmacro program-test (name &key return-code input output)
   `(test ,name
-     (let ((test-package (make-package
-                          (gensym (format nil "VACIETIS.TEST.~A" ',name))
-                          :use '(#:vacietis.c))))
-       (unwind-protect
-            (progn
-              (let ((*package* test-package))
-                (load-c-file
-                 (merge-pathnames
-                  (format nil "programs/~(~A~)/main.c" ',name)
-                  (directory-namestring
-                   #.(or *compile-file-truename* *load-truename*)))))
-              (let* ((test-output-stream (when ,output
-                                           (make-string-output-stream)))
-                     (result (run-c-program
-                              test-package
-                              :stdin (when ,input
-                                       (make-string-input-stream ,input))
-                              :stdout test-output-stream)))
-                (declare (ignorable result))
-                (when ,return-code
-                  (is (equal ,return-code result)))
-                (when ,output
-                  (is (equal ,output (get-output-stream-string
-                                      test-output-stream))))))
-         (delete-package test-package)))))
+     (do-with-temp-c-package ',name
+       (lambda ()
+         (load-c-file
+          (merge-pathnames
+           (format nil "programs/~(~A~)/main.c" ',name)
+           (directory-namestring #.(or *compile-file-truename* *load-truename*))))
+         (let* ((test-output-stream (when ,output
+                                      (make-string-output-stream)))
+                (result (run-c-program
+                         *package*
+                         :stdin (when ,input
+                                  (make-string-input-stream ,input))
+                         :stdout test-output-stream)))
+           (declare (ignorable result))
+           (when ,return-code
+             (is (equal ,return-code result)))
+           (when ,output
+             (is (equal ,output (get-output-stream-string
+                                 test-output-stream)))))))))
