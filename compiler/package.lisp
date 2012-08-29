@@ -3,15 +3,9 @@
 (defpackage #:vacietis
   (:use #:cl #:named-readtables #:anaphora)
   (:export
+   ;; readtables
    #:vacietis
    #:c-readtable
-   #:string-to-char*
-   #:*basic-c-types*
-   #:*type-qualifiers*
-   #:*c-structs*
-   #:*variable-sizes*
-   #:variable-size
-   #:literal
 
    ;; memory stuff
    #:size-of
@@ -22,10 +16,9 @@
    ;; utilities
    #:string-to-char*
    #:char*-to-string
-   #:define
-   #:include-libc-file
 
    ;; runtime
+   #:*preprocessor-state*
    #:load-c-file
    #:run-c-program
    ))
@@ -145,5 +138,3 @@
    #:[]
    ))
 
-(defpackage #:vacietis.reader
-  (:use #:cl #:named-readtables #:vacietis #:anaphora))

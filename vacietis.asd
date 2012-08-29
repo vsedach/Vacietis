@@ -14,8 +14,13 @@
             ((:file "package")
              (:file "types")
              (:file "implementation")
-             (:file "include")
-             (:file "reader")))
+             (:file "include")))
+   (:module :reader
+            :serial t
+            :components
+            ((:file "package")
+             (:file "reader"))
+            :depends-on (:compiler))
    (:module :libc
             :serial t
             :components
@@ -28,7 +33,7 @@
              (:file "stdlib")
              (:file "string")
              (:static-file "string.c"))
-            :depends-on (:compiler))
+            :depends-on (:compiler :reader))
    (:module :runtime
             :components
             ((:file "program"))

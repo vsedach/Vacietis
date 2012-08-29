@@ -3,6 +3,7 @@
 
 (defpackage #:vacietis.libc.errno.h
   (:use #:cl #:named-readtables #:vacietis)
+  (:import-from #:vacietis #:define)
   (:export
    #:errno
    #:EPERM
@@ -43,6 +44,7 @@
 
 (defpackage #:vacietis.libc.stddef.h
   (:use #:cl #:named-readtables #:vacietis)
+  (:import-from #:vacietis #:define)
   (:export
    #:NULL
    #:offsetof))
@@ -51,6 +53,7 @@
   `(defpackage ,name
      (:use #:cl #:named-readtables #:vacietis
            #:vacietis.libc.errno.h #:vacietis.libc.stddef.h)
+     (:import-from #:vacietis #:define #:memptr-mem #:memptr-ptr)
      (:import-from #:vacietis.c #:deref*)
      ,@other-opts))
 

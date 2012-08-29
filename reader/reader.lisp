@@ -34,34 +34,37 @@
 ;;; this makes things a lot less hairy
 
 (defvar %in)
-(defvar *current-file* nil)
-(defvar *line-number*)
+(defvar *c-file* nil)
+(defvar *line-number*  nil)
 
 ;;; error reporting
 
 (define-condition c-reader-error (reader-error) ;; SBCL hates simple-conditions?
-  ((line-number :reader line-number :initform *line-number*)
+  ((c-file      :reader c-file      :initform *c-file*)
+   (line-number :reader line-number :initform *line-number*)
    (msg         :reader msg         :initarg  :msg))
   (:report (lambda (condition stream)
              (write-string (msg condition) stream))))
 
 (defun read-error (msg &rest args)
-  (error (make-condition
-          'c-reader-error
-          :stream %in
-          :msg (format nil "Error reading from C stream at line ~a: ~?"
-                       *line-number* msg args))))
+  (error
+   (make-condition
+    'c-reader-error
+    :stream %in
+    :msg (format nil
+                 "Error reading C stream~@[ from file ~A~]~@[ at line ~A~]: ~?"
+                 *c-file* *line-number* msg args))))
 
 ;;; basic stream stuff
 
 (defun c-read-char ()
   (let ((c (read-char %in nil)))
-    (when (eql c #\Newline)
+    (when (and (eql c #\Newline) *line-number*)
       (incf *line-number*))
     c))
 
 (defun c-unread-char (c)
-  (when (eql c #\Newline)
+  (when (and (eql c #\Newline) *line-number*)
     (decf *line-number*))
   (unread-char c %in))
 
@@ -92,7 +95,7 @@
 
 (defun %maybe-read-comment ()
   (case (peek-char nil %in)
-    (#\/ (incf *line-number*)
+    (#\/ (when *line-number* (incf *line-number*))
          (read-line %in))
     (#\* (slurp-while (let ((previous-char (code-char 0)))
                         (lambda (c)
@@ -204,7 +207,7 @@
        (%maybe-read-comment)))))
 
 (defmacro lookup-define ()
-  `(gethash (read-c-identifier (next-char)) *preprocessor-defines*))
+  `(gethash (read-c-identifier (next-char)) *preprocessor-state*))
 
 (defun starts-with? (str x)
   (string= str x :end1 (min (length str) (length x))))
@@ -233,7 +236,7 @@
     (not (eql 0 (eval `(symbol-macrolet ,(let ((x))
                                               (maphash (lambda (k v)
                                                          (push (list k v) x))
-                                                       *preprocessor-defines*)
+                                                       *preprocessor-state*)
                                               x)
                          ,exp))))))
 
@@ -283,7 +286,7 @@
                          template)))
                  (pp-read-line))))
       (vacietis.c:undef
-       (remhash (read-c-identifier (next-char)) *preprocessor-defines*)
+       (remhash (read-c-identifier (next-char)) *preprocessor-state*)
        (pp-read-line))
       (vacietis.c:include
        (let* ((delimiter
@@ -295,11 +298,12 @@
                (slurp-while (lambda (c) (char/= c delimiter)))))
          (next-char)
          (if (char= delimiter #\")
-             (load-c-file (merge-pathnames
-                           include-file
-                           (directory-namestring
-                            (or *load-truename* *compile-file-truename*)))
-                          *preprocessor-defines*)
+             (%load-c-file (merge-pathnames
+                            include-file
+                            (directory-namestring
+                             (or *load-truename* *compile-file-truename*
+                                 *default-pathname-defaults*)))
+                           *preprocessor-state*)
              (include-libc-file include-file))))
       (vacietis.c:if
        (push 'if preprocessor-if-stack)
@@ -678,7 +682,7 @@
       (cond ((digit-char-p c) (read-c-number c))
             ((or (eql c #\_) (alpha-char-p c))
              (let ((symbol (read-c-identifier c)))
-               (aif (gethash symbol *preprocessor-defines*)
+               (aif (gethash symbol *preprocessor-state*)
                     (progn (setf %in
                                  (make-concatenated-stream
                                   (make-string-input-stream
@@ -729,21 +733,17 @@
 
 ;;; reader
 
-(defun do-with-c-compiler (thunk)
-  (let ((*readtable*  (find-readtable 'c-readtable))
-        (*line-number* 1))
-    (funcall thunk)))
-
 (defun cstr (str)
   (with-input-from-string (s str)
-    (let ((*preprocessor-defines* (make-hash-table)))
-     (do-with-c-compiler
-         (lambda ()
-           (cons 'progn (loop for it = (read s nil 'eof)
-                           while (not (eq it 'eof)) collect it)))))))
+    (let ((*preprocessor-state* (make-hash-table))
+          (*readtable*          (find-readtable 'c-readtable)))
+      (cons 'progn (loop for it = (read s nil 'eof)
+                         while (not (eq it 'eof)) collect it)))))
 
-(defun load-c-file (file &optional (*preprocessor-defines* (make-hash-table)))
-  (do-with-c-compiler
-      (lambda ()
-        (let ((*current-file* file))
-          (load file)))))
+(defun %load-c-file (*c-file* *preprocessor-state*)
+  (let ((*readtable*   (find-readtable 'c-readtable))
+        (*line-number* 1))
+    (load *c-file*)))
+
+(defun vacietis:load-c-file (file)
+  (%load-c-file file (make-hash-table)))

@@ -34,15 +34,6 @@
 
 (def-unary-op vacietis.c:~ lognot)
 
-(defmacro sizeof (x) ;; this is not used anywhere, for now
-  (cond ((intersection x vacietis.reader::*basic-c-types*) 1)
-        ((typedef? x) (typedef-size x))
-        (t (let ((var (gensym)))
-             `(let ((,var ,x))
-                (if (vectorp ,var)
-                    (length ,var)
-                    1))))))
-
 ;;; pointers, storage units and allocation
 
 (defstruct memptr

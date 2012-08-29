@@ -3,18 +3,17 @@
 
 (in-package #:vacietis.c)
 
-(cl:defparameter vacietis:*basic-c-types*
+(cl:defparameter vacietis::*basic-c-types*
   '(int void short long float double char))
 
-(cl:defparameter vacietis:*type-qualifiers*
+(cl:defparameter vacietis::*type-qualifiers*
   '(static const signed unsigned extern auto))
 
 (cl:in-package #:vacietis)
 
-(defvar *c-structs* (make-hash-table)) ;; needs to be weak
-
-;; right now just used to hold sizes
-(defvar *variable-sizes* (list (make-hash-table))) ;; this table needs to be weak
+;; these should at least be weak, but ideally only bound like *preprocessor-state*
+(defvar *c-structs* (make-hash-table))
+(defvar *variable-sizes* (list (make-hash-table)))
 
 (defun variable-size (name)
   (loop for env in *variable-sizes* thereis (gethash name env)))
@@ -23,3 +22,12 @@
   (acond ((member x *basic-c-types*) 1)
          ((variable-size x)          it)
          ((gethash x *c-structs*)    (length it))))
+
+;; (defmacro sizeof (x) ;; this is not used anywhere, for now
+;;   (cond ((intersection x *basic-c-types*) 1)
+;;         ((typedef? x) (typedef-size x))
+;;         (t (let ((var (gensym)))
+;;              `(let ((,var ,x))
+;;                 (if (vectorp ,var)
+;;                     (length ,var)
+;;                     1))))))
