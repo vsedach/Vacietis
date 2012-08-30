@@ -19,6 +19,8 @@
 (defun include-libc-file (include-file)
   (let ((libc-package (find-package (format nil "VACIETIS.LIBC.~:@(~A~)"
                                             include-file))))
+    (unless libc-package
+      (error "Can't find libc include file ~a" include-file))
     (use-package libc-package)
     (awhen (and (boundp       (pp-defines libc-package))
                 (symbol-value (pp-defines libc-package)))
