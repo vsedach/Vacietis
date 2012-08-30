@@ -8,5 +8,4 @@
                 #:*type-qualifiers*
                 #:*variable-sizes*
                 #:*c-structs*
-                #:literal
                 #:include-libc-file))

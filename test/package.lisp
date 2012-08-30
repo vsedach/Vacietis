@@ -9,7 +9,8 @@
 
 (defpackage #:vacietis.test.reader
   (:use #:vacietis.c)
-  (:import-from #:vacietis.test #:reader-test))
+  (:import-from #:vacietis.test #:reader-test)
+  (:import-from #:vacietis #:string-to-char*))
 
 (defpackage #:vacietis.test.basic
   (:use #:cl #:named-readtables #:eos)

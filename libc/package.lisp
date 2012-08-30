@@ -146,6 +146,8 @@
    #:setbuf
    #:setvbuf
    #:fgetc
+   #:getc
+   #:getchar
    #:fputc
    #:putc
    #:putchar

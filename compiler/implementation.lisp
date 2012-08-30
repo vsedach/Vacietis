@@ -193,10 +193,3 @@
 (defmacro c-struct (name slots)
   ;; DEFINE ACCESSORS!!!
   )
-
-;;; literals
-
-(defun literal (x)
-  (etypecase x
-    (string (string-to-char* x))
-    (array  (make-memptr :mem x))))

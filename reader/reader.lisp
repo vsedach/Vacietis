@@ -172,20 +172,21 @@
                                     (char-code c))))))
       c))
 
-(defun read-character-constant ()
-  (prog1 (read-char-literal (c-read-char))
+(defun read-character-constant (%in single-quote)
+  (declare (ignore single-quote))
+  (prog1 (char-code (read-char-literal (c-read-char)))
     (unless (char= (c-read-char) #\')
       (read-error "Junk in character constant"))))
 
-(defun read-c-string (c1)
-  (declare (ignore c1))
+(defun read-c-string (%in double-quotes)
+  (declare (ignore double-quotes))
   (let ((string (make-buffer 'character)))
     (loop-reading
-       (if (char= c #\") ;; c requires concatenation of adjacent string literals, retardo
+       (if (char= c #\") ;; c requires concatenation of adjacent string literals
            (progn (setf c (next-char nil))
                   (unless (eql c #\")
                     (when c (c-unread-char c))
-                    (return (literal string))))
+                    (return `(string-to-char* ,string))))
            (vector-push-extend (read-char-literal c) string)))))
 
 ;;; preprocessor
@@ -552,9 +553,10 @@
                             (vacietis.c:[]
                              (awhen (third x)
                                (setf preallocated-value
-                                     `(vacietis::allocate-memory ,it)))))
+                                     `(vacietis:allocate-memory ,it)))))
                           (parse-declaration (second x))))))
       (parse-declaration spec)
+      ;; this is totalle broken
       (setf (gethash name (car *variable-sizes*))
             (cond ((and (vectorp initial-value)
                         (eq 'literal (car initial-value)))
@@ -564,7 +566,7 @@
                   ((consp type) ;; assume struct
                    (let ((type-size (size-of (second type))))
                      (setf preallocated-value
-                           `(vacietis::allocate-memory ,type-size))
+                           `(vacietis:allocate-memory ,type-size))
                      type-size))
                   (t 1)))
       (if (boundp '*variable-declarations*)
@@ -677,6 +679,11 @@
                     it)))
              (t (c-unread-char two) one-match)))))
 
+(defun read-array-literal ()
+  (let ((content (map 'list #'parse-infix (c-read-delimited-list #\{ #\,))))
+    `(vacietis::make-memptr
+      :mem (make-array ,(length content) :initial-contents (list ,@content)))))
+
 (defun read-c-exp (c)
   (or (match-longest-op c)
       (cond ((digit-char-p c) (read-c-number c))
@@ -695,8 +702,10 @@
                     symbol)))
             (t
              (case c
-               (#\" (read-c-string c))
+               (#\" (read-c-string %in c))
+               (#\' (read-character-constant %in c))
                (#\( (read-exps-until (lambda (c) (eql #\) c))))
+               (#\{ (read-array-literal)) ;; decl only
                (#\[ (list 'vacietis.c:[]
                           (read-exps-until (lambda (c) (eql #\] c))))))))))
 
@@ -717,6 +726,9 @@
          (:macro-char #\# 'read-c-macro nil)
 
          (:macro-char #\/ 'read-c-comment nil)
+
+         (:macro-char #\" 'read-c-string nil)
+         (:macro-char #\' 'read-character-constant nil)
 
          ;; numbers (should this be here?)
          ,@(loop for i from 0 upto 9

@@ -21,16 +21,17 @@
 
 (reader-test string1
   "x = \"foo\";"
-  (= x "foo"))
+  (= x (string-to-char* "foo")))
 
 (reader-test string2
   "b = \"foo\" \"bar\";"
-  (= b "foobar"))
+  (= b (string-to-char* "foobar")))
 
 (reader-test string-escape1
   "_FOO = \"foo\\nbar\";"
-  (= _FOO "foo
-bar"))
+  ;; yup, \n is an escape and not a format string!
+  (= _FOO (string-to-char* "foo
+bar")))
 
 (reader-test identifier1
   "_foo;"
@@ -100,8 +101,8 @@ return a > b ? a : b;
 
 (reader-test function-call1
   "printf(\"hello, world\\n\");"
-  (printf "hello, world
-"))
+  (printf (string-to-char* "hello, world
+")))
 
 (reader-test function-call2
   "check_gc_signals_unblocked_or_lose(0);"
@@ -358,7 +359,7 @@ baz: a + b;
   "int lispobj[20];
 result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
                       UNBOXED_PAGE_FLAG);"
-  (cl:progn (cl:defparameter lispobj (vacietis::allocate-memory 20)))
+  (cl:progn (cl:defparameter lispobj (vacietis:allocate-memory 20)))
   (= result
      (pa_alloc
       (ALIGNED_SIZE
@@ -406,7 +407,7 @@ fahr = fahr + step;
   (for (cl:nil cl:nil (<= fahr upper) cl:nil)
     (cl:tagbody
        (= celsius (* 5 (/ (- fahr 32) 9)))
-       (printf "%dt%dn" fahr celsius)
+       (printf (string-to-char* "%dt%dn") fahr celsius)
        (= fahr (+ fahr step)))))
 
 (reader-test multiple-declaration0
@@ -421,8 +422,8 @@ printf(\"hello, world\\n\");
 "
   (cl:defun main ()
     (cl:prog* ()
-       (printf "hello, world
-")))
+       (printf (string-to-char* "hello, world
+"))))
   )
 
 (reader-test k&r-pg12
@@ -439,7 +440,7 @@ step = 20;
 fahr = lower;
 while (fahr <= upper) {
 celsius = 5 * (fahr-32) / 9;
-printf(\"%d\t%d\n\", fahr, celsius);
+printf(\"%d\t%d\\n\", fahr, celsius);
 fahr = fahr + step;
 }
 }
@@ -453,7 +454,8 @@ fahr = fahr + step;
        (for (cl:nil cl:nil (<= fahr upper) cl:nil)
             (cl:tagbody
                (= celsius (* 5 (/ (- fahr 32) 9)))
-               (printf "%dt%dn" fahr celsius)
+               (printf (string-to-char* "%dt%d
+") fahr celsius)
                (= fahr (+ fahr step)))))))
 
 (reader-test k&r-pg16
@@ -467,8 +469,8 @@ printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
   (cl:defun main ()
     (cl:prog* ((fahr 0))
        (for (() (= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
-            (printf "%3d %6.1f
-"
+            (printf (string-to-char* "%3d %6.1f
+")
                     fahr (* (/ 5.0 9.0) (- fahr 32)))))))
 
 (reader-test c99-style-for-init
@@ -575,11 +577,11 @@ while (c != EOF) {
 
 (reader-test array-of-pointers-to-int1
   "int *foobar[5];"
-  (cl:progn (cl:defparameter foobar (vacietis::allocate-memory 5))))
+  (cl:progn (cl:defparameter foobar (vacietis:allocate-memory 5))))
 
 (reader-test array-of-ints1
   "int foobar[5];"
-  (cl:progn (cl:defparameter foobar (vacietis::allocate-memory 5))))
+  (cl:progn (cl:defparameter foobar (vacietis:allocate-memory 5))))
 
 (reader-test pointer-to-int0
   "int *x;"
@@ -587,7 +589,7 @@ while (c != EOF) {
 
 (reader-test char-literal0
   "char foobar[] = \"Foobar\";"
-  (cl:progn (cl:defparameter foobar "Foobar")))
+  (cl:progn (cl:defparameter foobar (string-to-char* "Foobar"))))
 
 (reader-test declaration-initialization0
   "int x = 1 + 2;"
@@ -680,8 +682,8 @@ while (c != EOF) {
 (reader-test declare-two-chars-initialize0
   "char source_pointer[] = \"foobar\", dest_pointer[7];"
   (cl:progn
-    (cl:defparameter source_pointer "foobar")
-    (cl:defparameter dest_pointer (vacietis::allocate-memory 7))))
+    (cl:defparameter source_pointer (string-to-char* "foobar"))
+    (cl:defparameter dest_pointer (vacietis:allocate-memory 7))))
 
 (reader-test aref0
   "x[5];"
@@ -729,8 +731,8 @@ double imag;
 (reader-test simple-struct-decl
   "struct complex { double real; double imag; } x, y;"
   (cl:progn (vacietis::c-struct complex real imag)
-            (cl:progn (cl:defparameter x (vacietis::allocate-memory 2))
-                      (cl:defparameter y (vacietis::allocate-memory 2)))))
+            (cl:progn (cl:defparameter x (vacietis:allocate-memory 2))
+                      (cl:defparameter y (vacietis:allocate-memory 2)))))
 
 (reader-test struct-forward-declaration
   "struct cell;"

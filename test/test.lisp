@@ -15,22 +15,15 @@
   (format t "Running program tests:~&")
   (run! 'program-tests))
 
-(defun c-equal (C CL)
-  (let ((CL (if (stringp CL) (string-to-char* CL) CL)))
-    (if (or (atom C) (atom CL))
-        (equalp C CL)
-        (and (c-equal (car C) (car CL)) (c-equal (cdr C) (cdr CL))))))
-
 (defmacro reader-test (name input &rest s-exps)
   `(test ,name
-     (is (c-equal
-          (vacietis.reader::cstr ,input)
-          '(progn ,@s-exps)))))
+     (is (equalp '(progn ,@s-exps)
+                 (vacietis.reader::cstr ,input)))))
 
 (defun do-with-temp-c-package (name thunk)
   (let ((test-package (make-package
                        (gensym (format nil "VACIETIS.TEST.~A" name))
-                       :use '(#:vacietis.c))))
+                       :use ())))
     (unwind-protect
          (let ((*package* test-package))
            (funcall thunk))

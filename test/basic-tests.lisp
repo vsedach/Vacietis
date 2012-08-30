@@ -179,6 +179,12 @@ reverse(foo);
 foo;"
   "raboof")
 
+(eval-test sprintf-padchar
+  "#include <stdio.h>
+char *foo[6];
+sprintf(foo, \"%-5c\", 'X');"
+  "X    ")
+
 ;;; fixme: literals and '' single quoting
 ;; (eval-test sizeof-literal
 ;;   "sizeof('c');"
