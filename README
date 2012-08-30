@@ -47,8 +47,12 @@ The basic idea for the Vacietis runtime and memory model comes from
 Scott L. Burson's Zeta-C compiler for Lisp Machines:
 http://www.bitsavers.org/bits/TI/Explorer/zeta-c/
 
+The technique for representing pointers to arbitrary C lvalues as
+closures was first demonstrated by Oleg Kiselyov:
+http://okmij.org/ftp/Scheme/pointer-as-closure.txt
+
 The idea for a combined single-pass preprocessor/tokenizer/parser
-comes from Patrice Bellard's TCC: http://bellard.org/tcc/
+comes from Fabrice Bellard's TCC: http://bellard.org/tcc/
 
 
 * OBTAINING CODE AND HELP:
@@ -70,6 +74,7 @@ vsedach@gmail.com
 
 * TODO:
   ----
+- array constants
 - struct accessors
 - enums
 - function pointers
