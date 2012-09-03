@@ -18,8 +18,8 @@
    #:char*-to-string
 
    ;; runtime
-   #:*preprocessor-state*
-   #:make-pp-state
+   #:*compiler-state*
+   #:make-compiler-state
    #:load-c-file
    #:run-c-program
    ))

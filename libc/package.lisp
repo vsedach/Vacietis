@@ -123,6 +123,14 @@
    #:memchr
    #:memcmp))
 
+(deflibcpkg #:vacietis.libc.stdarg.h
+  (:export
+   #:va_list
+   #:va_start
+   #:va_arg
+   #:va_end
+   #:va_copy))
+
 (deflibcpkg #:vacietis.libc.stdio.h
   (:shadow #:remove)
   (:import-from #:vacietis.libc.string.h #:strerror)

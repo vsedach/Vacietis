@@ -4,8 +4,8 @@
 (defpackage #:vacietis.reader
   (:use #:cl #:named-readtables #:vacietis #:anaphora)
   (:import-from #:vacietis
-                #:*basic-c-types*
-                #:*type-qualifiers*
-                #:*variable-sizes*
-                #:*c-structs*
-                #:include-libc-file))
+    #:compiler-state-pp
+    #:compiler-state-typedefs
+    #:compiler-state-structs
+    #:compiler-state-var-sizes
+    #:include-libc-file))

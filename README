@@ -12,24 +12,21 @@ Vacietis comes with a libc implemented in portable Common Lisp.
 * USAGE:
   -----
 
-C code can be read in exactly like regular Lisp code by using
+C code can be read in the same way as regular Lisp code by using
 readtables:
 
-(let ((*readtable* vacietis:c-readtable))
+(let ((*readtable*               vacietis:c-readtable)
+      (vacietis:*compiler-state* (vacietis:make-compiler-state)))
   (read <some stream>))
 
-If the C code being read contains preprocessor directives, the
-preprocessor state (ie #defines) can be maintained (this is handy for
-constructing things like a C REPL, for example):
-
-(let ((*readtable*                   vacietis:c-readtable)
-      (vacietis:*preprocessor-state* (vacietis:make-pp-state)))
-  (read <some stream>))
+The Vacietis reader keeps track of type and preprocessor
+macro declarations in a compiler state object bound by
+*compiler-state*. This mechanism is exposed to make it possible to
+create things like C REPLs.
 
 To simplify loading C files, a convenience function is provided that
-sets up the readtable, blank preprocessor state (which is the normal,
-per-file C behavior), and additional debugging information before
-calling LOAD:
+sets up the readtable, compiler state, and additional debugging
+information before calling LOAD:
 
 (vacietis:load-c-file "/foo/bar/file.c")
 

@@ -1,11 +1,6 @@
 (in-package #:vacietis)
 (in-readtable vacietis)
 
-(defvar *preprocessor-state* nil)
-
-(defun make-pp-state ()
-  (make-hash-table))
-
 (defun pp-defines (pkg)
   (intern "*PREPROCESSOR-DEFINES*" pkg))
 
@@ -26,6 +21,6 @@
                 (symbol-value (pp-defines libc-package)))
       (maphash (lambda (name expansion)
                  (setf (gethash (intern (symbol-name name) *package*)
-                                *preprocessor-state*)
+                                (compiler-state-pp *compiler-state*))
                        expansion))
                it))))
