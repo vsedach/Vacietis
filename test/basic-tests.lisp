@@ -185,6 +185,12 @@ char *foo[6];
 sprintf(foo, \"%-5c\", 'X');"
   "X    ")
 
+(eval-test typedef
+  "typedef int Baz;
+Baz baz = 4;
+baz;"
+  4)
+
 ;;; fixme: literals and '' single quoting
 ;; (eval-test sizeof-literal
 ;;   "sizeof('c');"

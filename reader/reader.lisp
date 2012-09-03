@@ -629,7 +629,7 @@
   (setf (gethash name (compiler-state-typedefs *compiler-state*)) type)
   (ecase (c-read-char)
     (#\, (read-typedef type (next-exp)))
-    (#\;)))
+    (#\; t)))
 
 (defun read-declaration (token)
   (when (or (c-type? token) (eq 'vacietis.c:typedef token))
@@ -645,7 +645,7 @@
              (read-function name))
             ((eq type 'vacietis.c:struct)
              (read-struct name))
-            ((eq type 'vacietis.c:typedef)
+            ((eq token 'vacietis.c:typedef)
              (read-typedef type name))
             (t
              (read-variable-declaration name (unless pointer? type)))))))
