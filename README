@@ -9,6 +9,18 @@ Common Lisp arrays.
 Vacietis comes with a libc implemented in portable Common Lisp.
 
 
+* INSTALLING:
+  ----------
+
+You can obtain Vacietis from github:
+git clone https://github.com/vsedach/Vacietis.git
+
+All Vacietis dependencies are available via Quicklisp
+(http://www.quicklisp.org/). If you put Vacietis in
+quicklisp/local-projects/ you can just load it with
+(ql:quickload "vacietis")
+
+
 * USAGE:
   -----
 
@@ -67,6 +79,16 @@ the github issue tracker:
 https://github.com/vsedach/vacietis
 or directly to the author:
 vsedach@gmail.com
+
+
+* UNIT TESTS:
+  ----------
+
+(ql:quickload "vacietis.test")
+(vacietis.test:run-tests)
+
+The Vacietis test suite includes a variety of code that tests the
+compiler and libc.
 
 
 * TODO:
