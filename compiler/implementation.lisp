@@ -30,7 +30,8 @@
   *    *
   /    /
   %    rem
-  )
+  <<   ash
+  >>   (lambda (int count) (ash int (- count))))
 
 (def-unary-op vacietis.c:~ lognot)
 

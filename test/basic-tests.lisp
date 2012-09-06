@@ -191,6 +191,18 @@ Baz baz = 4;
 baz;"
   4)
 
+(eval-test define-define
+  "#define FOO 1
+#define BAR FOO
+BAR;"
+  1)
+
+(eval-test define-define1
+  "#define fo0 (x, y) x >> y
+#define Bar fo0
+Bar(0xFFF, 2);"
+  1023)
+
 ;;; fixme: literals and '' single quoting
 ;; (eval-test sizeof-literal
 ;;   "sizeof('c');"
