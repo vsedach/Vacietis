@@ -23,4 +23,9 @@
                  (setf (gethash (intern (symbol-name name) *package*)
                                 (compiler-state-pp *compiler-state*))
                        expansion))
-               it))))
+               it))
+    (awhen (probe-file
+            (merge-pathnames
+             (format nil "../libc/~a" include-file)
+             #.(or *compile-file-truename* *load-truename*)))
+      (vacietis.reader::%load-c-file it *compiler-state*))))

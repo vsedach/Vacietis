@@ -50,6 +50,10 @@ Index    Item    Difference
   7       -54.50        -56.50
 ")
 
+(program-test varargs1
+              :output "Sum is 15"
+              :return-code 1)
+
 ;; needs scanf
 ;; (program-test hanly-113
 ;;               :input "200"

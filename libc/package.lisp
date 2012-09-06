@@ -53,8 +53,8 @@
   `(defpackage ,name
      (:use #:cl #:named-readtables #:vacietis
            #:vacietis.libc.errno.h #:vacietis.libc.stddef.h)
-     (:import-from #:vacietis #:define #:memptr-mem #:memptr-ptr)
-     (:import-from #:vacietis.c #:deref*)
+     (:import-from #:vacietis #:define)
+     (:import-from #:vacietis.c #:deref* #:mkptr&)
      ,@other-opts))
 
 (deflibcpkg #:vacietis.libc.math.h
@@ -127,7 +127,7 @@
   (:export
    #:va_list
    #:va_start
-   #:va_arg
+   #:__va_arg
    #:va_end
    #:va_copy))
 

@@ -314,7 +314,7 @@
                              (or *load-truename* *compile-file-truename*
                                  *default-pathname-defaults*)))
                            *compiler-state*)
-             (include-libc-file include-file))))
+             (vacietis::include-libc-file include-file))))
       (vacietis.c:if
        (push 'if preprocessor-if-stack)
        (unless (preprocessor-test (pp-read-line))
@@ -557,8 +557,11 @@
    `(defun ,name
         ,(loop for xs across (c-read-delimited-list (next-char) #\,) append
               (loop for x across xs
-                    unless (or (c-type? x) (eq 'vacietis.c:* x))
-                    collect x))
+                    if (eq x 'vacietis.c:|.|)
+                      collect '&rest and collect 'vacietis.c:|...|
+                      and do (loop-finish)
+                    else if (not (or (c-type? x) (eq 'vacietis.c:* x)))
+                      collect x))
       ,(let* ((*variable-declarations* ())
               (body (read-c-block (next-char))))
         `(prog* ,*variable-declarations* ,@body)))))
