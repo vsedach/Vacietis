@@ -93,10 +93,8 @@ compiler and libc.
 
 * TODO:
   ----
-- array constants
 - struct accessors
 - enums
-- function pointers
 - libc stdio: scanf, binary streams
 - libc stddef: offsetof
 - libc signal

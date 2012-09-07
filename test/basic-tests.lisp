@@ -203,7 +203,71 @@ BAR;"
 Bar(0xFFF, 2);"
   1023)
 
-;;; fixme: literals and '' single quoting
-;; (eval-test sizeof-literal
-;;   "sizeof('c');"
-;;   2)
+(eval-test function-pointer1
+  "int add(int *x, int *y) {
+  return *x + *y;
+}
+
+int apply(int ((*fun))(int *, int *), int x, int y) {
+  return (*fun)(&x, &y);
+}
+
+apply((int (*)(int *, int *)) add, 2, 3);"
+  5)
+
+(eval-test simple-function1
+  "void foo(int a, int b) {
+return a + b;
+}
+foo(11, 13);"
+  24)
+
+(eval-test function0
+  "int max(int a, int b)
+{
+return a > b ? a : b;
+}
+max(-3, 10);"
+  10)
+
+(eval-test function1
+  "extern int max(int a, int b)
+{
+return a > b ? a : b;
+}
+max(234, 0);"
+  234)
+
+(eval-test no-arg-function
+  "int a = -4, b = 7;
+void foo() {
+return a + b;
+}
+foo();"
+  3)
+
+(eval-test labeled-statement1
+  "void foo() {
+int a = 2, b = 5;
+int c = 3;
+goto baz;
+c = 7;
+baz:
+return a + b + c;
+}
+foo();"
+  10)
+
+(eval-test h&s-while1
+  "int pow(int base, int exponent)
+{
+    int result = 1;
+    while (exponent > 0) {
+        if ( exponent % 2 ) result *= base;
+        base *= base;
+        exponent /= 2;
+    }
+    return result;
+}
+pow(3, 4);"
+  81)

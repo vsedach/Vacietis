@@ -49,34 +49,6 @@ bar")))
   "int x;"
   (cl:progn (cl:defparameter x 0)))
 
-;;; function definition
-
-(reader-test simple-function1
-  "void foo(int a, int b) {
-a + b;
-}"
-  (cl:defun foo (a b)
-    (cl:prog* ()
-       (+ a b))))
-
-(reader-test function0
-  "int max(int a, int b)
-{
-return a > b ? a : b;
-}"
-  (cl:defun max (a b)
-    (cl:prog* ()
-       (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b)))))
-
-(reader-test function1
-  "extern int max(int a, int b)
-{
-return a > b ? a : b;
-}"
-  (cl:defun max (a b)
-    (cl:prog* ()
-       (cl:return (cl:if (cl:not (cl:eql 0 (> a b))) a b)))))
-
 ;;; function calls
 
 (reader-test funcall-args0
@@ -168,7 +140,7 @@ return a > b ? a : b;
 
 (reader-test op-precedence1
   "a + b + c;"
-  (+ a (+ b c)))
+  (+ (+ a b) c))
 
 (reader-test assign1
   "foo = 1;"
@@ -190,9 +162,9 @@ return a > b ? a : b;
   "(SymbolValue(GC_PENDING,th) == NIL) &&
    (SymbolValue(GC_INHIBIT,th) == NIL) &&
    (random() < RAND_MAX/100);"
-  (&& (== (SymbolValue GC_PENDING th) NIL)
-      (&& (== (SymbolValue GC_INHIBIT th) NIL)
-          (< (random) (/ RAND_MAX 100)))))
+  (&& (&& (== (SymbolValue GC_PENDING th) NIL)
+          (== (SymbolValue GC_INHIBIT th) NIL))
+      (< (random) (/ RAND_MAX 100))))
 
 (reader-test funcall-compare
   "SymbolValue(GC_PENDING,th) == NIL;"
@@ -234,9 +206,9 @@ return a > b ? a : b;
         maybe_save_gc_mask_and_block_deferrables(NULL);
     }"
   (cl:if (cl:eql 0
-                 (&& (== (SymbolValue GC_PENDING th) NIL)
-                     (&& (== (SymbolValue GC_INHIBIT th) NIL)
-                         (< (random) (/ RAND_MAX 100)))))
+                 (&& (&& (== (SymbolValue GC_PENDING th) NIL)
+                         (== (SymbolValue GC_INHIBIT th) NIL))
+                     (< (random) (/ RAND_MAX 100))))
          cl:nil
          (cl:tagbody
             (SetSymbolValue GC_PENDING T th)
@@ -250,9 +222,9 @@ return a > b ? a : b;
 1;
     }"
   (cl:if (cl:eql 0
-                 (&& (== (SymbolValue GC_PENDING th) NIL)
-                     (&& (== (SymbolValue GC_INHIBIT th) NIL)
-                         (< (random) (/ RAND_MAX 100)))))
+                 (&& (&& (== (SymbolValue GC_PENDING th) NIL)
+                         (== (SymbolValue GC_INHIBIT th) NIL))
+                     (< (random) (/ RAND_MAX 100))))
          cl:nil
          (cl:tagbody 1)))
 
@@ -339,22 +311,6 @@ return a > b ? a : b;
   "*x++;"
   (deref* (cl:prog1 x (= x (+ x 1)))))
 
-(reader-test no-arg-function
-  "void foo() {
-a + b;
-}"
-  (cl:defun foo ()
-    (cl:prog* ()
-       (+ a b))))
-
-(reader-test labeled-statement1
-  "void foo() {
-baz: a + b;
-}"
-  (cl:defun foo ()
-    (cl:prog* ()
-     baz (+ a b))))
-
 (reader-test sizeof-something
   "int lispobj[20];
 result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
@@ -375,8 +331,10 @@ result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
   "void main () {
 int x;
 }"
-  (cl:defun main ()
-    (cl:prog* ((x 0))))
+  (cl:progn
+    (cl:defun main ()
+      (cl:prog* ((x 0))))
+    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main))))
   )
 
 (reader-test function-comments0
@@ -384,8 +342,10 @@ int x;
 /* this is a comment */
 int x;
 }"
-  (cl:defun main ()
-    (cl:prog* ((x 0))))
+  (cl:progn
+    (cl:defun main ()
+     (cl:prog* ((x 0))))
+    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main))))
   )
 
 (reader-test function-comments1
@@ -394,20 +354,23 @@ int x;
 int x;
 // this is another comment
 }"
-  (cl:defun main ()
-    (cl:prog* ((x 0))))
+  (cl:progn
+    (cl:defun main ()
+      (cl:prog* ((x 0))))
+    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main))))
   )
 
 (reader-test while0
   "while (fahr <= upper) {
 celsius = 5 * (fahr-32) / 9;
-printf(\"%d\t%d\n\", fahr, celsius);
+printf(\"%d\\t%d\\n\", fahr, celsius);
 fahr = fahr + step;
 }"
   (for (cl:nil cl:nil (<= fahr upper) cl:nil)
     (cl:tagbody
-       (= celsius (* 5 (/ (- fahr 32) 9)))
-       (printf (string-to-char* "%dt%dn") fahr celsius)
+       (= celsius (/ (* 5 (- fahr 32)) 9))
+       (printf (string-to-char* "%d	%d
+") fahr celsius)
        (= fahr (+ fahr step)))))
 
 (reader-test multiple-declaration0
@@ -420,58 +383,12 @@ fahr = fahr + step;
 printf(\"hello, world\\n\");
 }
 "
-  (cl:defun main ()
-    (cl:prog* ()
-       (printf (string-to-char* "hello, world
+  (cl:progn
+    (cl:defun main ()
+      (cl:prog* ()
+         (printf (string-to-char* "hello, world
 "))))
-  )
-
-(reader-test k&r-pg12
-  "void main()
-{
-int fahr, celsius;
-int lower, upper, step;
-lower = 0;
-upper = 300;
-step = 20;
-/* lower limit of temperature scale */
-/* upper limit */
-/* step size */
-fahr = lower;
-while (fahr <= upper) {
-celsius = 5 * (fahr-32) / 9;
-printf(\"%d\t%d\\n\", fahr, celsius);
-fahr = fahr + step;
-}
-}
-"
-  (cl:defun main ()
-    (cl:prog* ((step 0) (upper 0) (lower 0) (celsius 0) (fahr 0))
-       (= lower 0)
-       (= upper 300)
-       (= step 20)
-       (= fahr lower)
-       (for (cl:nil cl:nil (<= fahr upper) cl:nil)
-            (cl:tagbody
-               (= celsius (* 5 (/ (- fahr 32) 9)))
-               (printf (string-to-char* "%dt%d
-") fahr celsius)
-               (= fahr (+ fahr step)))))))
-
-(reader-test k&r-pg16
-  "void main()
-{
-int fahr;
-for (fahr = 0; fahr <= 300; fahr = fahr + 20)
-printf(\"%3d %6.1f\\n\", fahr, (5.0/9.0)*(fahr-32));
-}
-"
-  (cl:defun main ()
-    (cl:prog* ((fahr 0))
-       (for (() (= fahr 0) (<= fahr 300) (= fahr (+ fahr 20)))
-            (printf (string-to-char* "%3d %6.1f
-")
-                    fahr (* (/ 5.0 9.0) (- fahr 32)))))))
+    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main)))))
 
 (reader-test c99-style-for-init
   "for (int x = 0; x < 10; x++)
@@ -487,23 +404,6 @@ x++;"
         (cl:prog1 x (= x (+ x 1))))
     (+= foobar x)))
 
-(reader-test k&r-pg18
-  "void main()
-{
-int c;
-c = getchar();
-while (c != EOF) {
-  putchar(c);
-  c = getchar();
-}
-}
-"
-  (cl:defun main ()
-    (cl:prog* ((c 0))
-       (= c (getchar))
-       (for (cl:nil cl:nil (!= c EOF) cl:nil)
-            (cl:tagbody (putchar c) (= c (getchar)))))))
-
 (reader-test var-declare-and-initialize0
   "int x = 1;"
   (cl:progn (cl:defparameter x 1)))
@@ -512,36 +412,14 @@ while (c != EOF) {
   "1 % 2;"
   (% 1 2))
 
-(reader-test h&s-while1
-  "int pow(int base, int exponent)
-{
-    int result = 1;
-    while (exponent > 0) {
-        if ( exponent % 2 ) result *= base;
-        base *= base;
-        exponent /= 2;
-    }
-    return result;
-}"
-  (cl:defun pow (base exponent)
-    (cl:prog*
-        ((result 0))
-       (cl:progn (= result 1))
-       (for (cl:nil cl:nil (> exponent 0) cl:nil)
-            (cl:tagbody
-               (cl:if (cl:eql 0 (% exponent 2))
-                      cl:nil
-                      (*= result base))
-               (*= base base)
-               (/= exponent 2)))
-       (cl:return result))))
-
 (reader-test empty-label
   "int main () { end:; }"
-  (cl:defun main ()
-    (cl:prog* ()
-     end
-     cl:nil)))
+  (cl:progn
+    (cl:defun main ()
+     (cl:prog* ()
+      end
+      cl:nil))
+    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main)))))
 
 (reader-test h&s-while2
   "while ( *char_pointer++ );"
@@ -702,11 +580,13 @@ while (c != EOF) {
 static short s;
 auto short *sp = &s + 3, *msp = &s - 3;
 }"
-  (cl:defun main ()
-    (cl:prog* ((msp 0) (sp 0) (s 0))
-       (cl:progn
-         (= sp (+ (mkptr& s) 3))
-         (= msp (- (mkptr& s) 3))))))
+  (cl:progn
+      (cl:defun main ()
+        (cl:prog* ((msp 0) (sp 0) (s 0))
+           (cl:progn
+             (= sp (+ (mkptr& s) 3))
+             (= msp (- (mkptr& s) 3)))))
+      (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main)))))
 
 (reader-test deref-op-precedence
   "&p + 1;"
@@ -743,9 +623,11 @@ double imag;
 {
    return 2;
 }"
-  (cl:defun strrchr (s c)
-    (cl:prog* cl:nil
-       (cl:return 2))))
+  (cl:progn
+    (cl:defun strrchr (s c)
+      (cl:prog* cl:nil
+         (cl:return 2)))
+    (cl:setf (cl:symbol-value 'strrchr) (mkptr& (cl:symbol-function 'strrchr)))))
 
 (reader-test deref-exp
   "*(foo + 1)"

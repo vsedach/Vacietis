@@ -28,7 +28,10 @@
   ^    logxor
   &    logand
   *    *
-  /    /
+  /    (lambda (x y)
+         (if (and (integerp x) (integerp y))
+             (truncate x y)
+             (/ x y)))
   %    rem
   <<   ash
   >>   (lambda (int count) (ash int (- count))))

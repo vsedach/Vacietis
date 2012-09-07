@@ -366,9 +366,10 @@
           (return (parse-infix (aref exp start))))
         (labels ((cast? (x)
                    (and (vectorp x) (some #'c-type? x)))
-                 (match-binary-ops (table)
+                 (match-binary-ops (table &key (lassoc t))
                    (position-if (lambda (x) (find x table))
-                                exp :start (1+ start) :end (1- end)))
+                                exp :start (1+ start) :end (1- end)
+                                :from-end lassoc))
                  (parse-binary (i &optional op)
                    (list (or op (aref exp i))
                          (parse-infix exp start  i)
@@ -378,7 +379,7 @@
           (awhen (match-binary-ops '(vacietis.c:|,|))
             (return (parse-binary it 'progn)))
           ;; assignment
-          (awhen (match-binary-ops *assignment-ops*)
+          (awhen (match-binary-ops *assignment-ops* :lassoc nil)
             (return (parse-binary it)))
           ;; elvis
           (awhen (position 'vacietis.c:? exp :start start :end end)
@@ -446,12 +447,16 @@
                         (read-error "Unexpected list when parsing ~A" exp))))
                  ((vectorp x) ;; funcall
                   (return-from parse-infix
-                    (cons (parse-infix exp start i)
-                          (loop with xstart = 0
-                             for next = (position 'vacietis.c:|,| x :start xstart)
-                             when (< 0 (length x))
-                             collect (parse-infix x xstart (or next (length x)))
-                             while next do (setf xstart (1+ next))))))))
+                    (let ((fun-exp (parse-infix exp start i)))
+                     (append
+                      (if (symbolp fun-exp)
+                          (list fun-exp)
+                          (list 'funcall fun-exp))
+                      (loop with xstart = 0
+                            for next = (position 'vacietis.c:|,| x :start xstart)
+                            when (< 0 (length x))
+                              collect (parse-infix x xstart (or next (length x)))
+                            while next do (setf xstart (1+ next)))))))))
           (read-error "Error parsing expression: ~A" (subseq exp start end))))
       exp))
 
@@ -525,6 +530,8 @@
               if-exp
               `(progn ,if-exp ,(%read-c-statement next-token))))
         (case statement
+          (vacietis.c:goto
+            `(go ,(read-c-statement (next-char))))
           (vacietis.c:return
             `(return ,(or (read-c-statement (next-char)) 0)))
           (vacietis.c:while
@@ -554,17 +561,38 @@
 
 (defun read-function (name)
   (let ((*local-sizes* (make-hash-table)))
-   `(defun ,name
-        ,(loop for xs across (c-read-delimited-list (next-char) #\,) append
-              (loop for x across xs
-                    if (eq x 'vacietis.c:|.|)
-                      collect '&rest and collect 'vacietis.c:|...|
-                      and do (loop-finish)
-                    else if (not (or (c-type? x) (eq 'vacietis.c:* x)))
-                      collect x))
-      ,(let* ((*variable-declarations* ())
-              (body (read-c-block (next-char))))
-        `(prog* ,*variable-declarations* ,@body)))))
+   `(progn
+      (defun ,name
+          ,(let (arglist)
+            (block done-arglist
+              (loop for param across (c-read-delimited-list (next-char) #\,) do
+                   (block done-arg
+                     (labels ((strip-type (x)
+                                (cond ((symbolp x)
+                                       (push x arglist)
+                                       (return-from done-arg))
+                                      ((vectorp x)
+                                       (loop for x1 across x do
+                                            (when (not (or (c-type? x1)
+                                                           (eq 'vacietis.c:* x1)))
+                                              (strip-type x1))))
+                                      (t
+                                       (read-error
+                                        "Junk in argument list: ~A" x)))))
+                      (loop for x across param do
+                           (cond
+                             ((eq x 'vacietis.c:|.|)
+                              (progn (push '&rest            arglist)
+                                     (push 'vacietis.c:|...| arglist)
+                                     (return-from done-arglist)))
+                             ((not (or (c-type? x) (eq 'vacietis.c:* x)))
+                              (strip-type x))))))))
+            (reverse arglist))
+        ,(let* ((*variable-declarations* ())
+                (body                    (read-c-block (next-char))))
+          `(prog* ,*variable-declarations* ,@body)))
+
+      (setf (symbol-value ',name) (vacietis.c:mkptr& (symbol-function ',name))))))
 
 ;; fixme: shit code
 (defun process-variable-declaration (spec type)
