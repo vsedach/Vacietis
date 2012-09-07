@@ -560,39 +560,42 @@
                ,(read-block-or-statement)))))))
 
 (defun read-function (name)
-  (let ((*local-sizes* (make-hash-table)))
-   `(progn
-      (defun ,name
-          ,(let (arglist)
-            (block done-arglist
-              (loop for param across (c-read-delimited-list (next-char) #\,) do
-                   (block done-arg
-                     (labels ((strip-type (x)
-                                (cond ((symbolp x)
-                                       (push x arglist)
-                                       (return-from done-arg))
-                                      ((vectorp x)
-                                       (loop for x1 across x do
-                                            (when (not (or (c-type? x1)
-                                                           (eq 'vacietis.c:* x1)))
-                                              (strip-type x1))))
-                                      (t
-                                       (read-error
-                                        "Junk in argument list: ~A" x)))))
-                      (loop for x across param do
-                           (cond
-                             ((eq x 'vacietis.c:|.|)
-                              (progn (push '&rest            arglist)
-                                     (push 'vacietis.c:|...| arglist)
-                                     (return-from done-arglist)))
-                             ((not (or (c-type? x) (eq 'vacietis.c:* x)))
-                              (strip-type x))))))))
-            (reverse arglist))
-        ,(let* ((*variable-declarations* ())
-                (body                    (read-c-block (next-char))))
-          `(prog* ,*variable-declarations* ,@body)))
+  (let (arglist)
+    (block done-arglist
+      (loop for param across (c-read-delimited-list (next-char) #\,) do
+           (block done-arg
+             (labels ((strip-type (x)
+                        (cond ((symbolp x)
+                               (push x arglist)
+                               (return-from done-arg))
+                              ((vectorp x)
+                               (loop for x1 across x do
+                                    (when (not (or (c-type? x1)
+                                                   (eq 'vacietis.c:* x1)))
+                                      (strip-type x1))))
+                              (t
+                               (read-error
+                                "Junk in argument list: ~A" x)))))
+               (loop for x across param do
+                    (cond
+                      ((eq x 'vacietis.c:|.|)
+                       (progn (push '&rest            arglist)
+                              (push 'vacietis.c:|...| arglist)
+                              (return-from done-arglist)))
+                      ((not (or (c-type? x) (eq 'vacietis.c:* x)))
+                       (strip-type x))))))))
+    (if (eql (peek-char nil %in) #\;)
+        (prog1 t (c-read-char)) ;; forward declaration
+        `(progn
+           (defun ,name ,(reverse arglist)
+             ,(let* ((*variable-declarations* ())
+                     (*local-sizes*           (make-hash-table))
+                     (body                    (read-c-block (next-char))))
+               `(prog* ,*variable-declarations*
+                   ,@body)))
 
-      (setf (symbol-value ',name) (vacietis.c:mkptr& (symbol-function ',name))))))
+           (setf (symbol-value ',name)
+                 (vacietis.c:mkptr& (symbol-function ',name)))))))
 
 ;; fixme: shit code
 (defun process-variable-declaration (spec type)

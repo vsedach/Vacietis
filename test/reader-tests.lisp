@@ -697,10 +697,10 @@ double imag;
   (== (deref* (cl:prog1 s (= s (+ s 1))))
       (~ (deref* (deref* (= c (- c 1)))))))
 
-;; (reader-test function-returning-pointer-to-int
-;;   "int *foo();"
-;;   nil)
-;; declaration, should be ignored?
+(reader-test function-returning-pointer-to-int-forward-decl
+  "int *foo();
+123;"
+  123)
 
 ;; (reader-test array-of-array-of-ints
 ;;   "int foobar[5][5];")
