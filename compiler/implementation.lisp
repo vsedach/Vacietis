@@ -50,12 +50,12 @@
           (adjust-array unicode (1+ (length unicode)) :initial-element 0))))
 
 (defun char*-to-string (char*)
-  (let ((mem   (memptr-mem char*))
-        (start (memptr-ptr char*)))
-   (babel:octets-to-string mem
-                           :encoding :utf-8
-                           :start start
-                           :end (position 0 mem :start start))))
+  (let* ((mem        (memptr-mem char*))
+         (start      (memptr-ptr char*))
+         (end        (position 0 mem :start start))
+         (byte-array (make-array (- end start) :element-type '(unsigned-byte 8))))
+    (replace byte-array mem :start2 start :end2 end)
+    (babel:octets-to-string byte-array :encoding :utf-8)))
 
 (defun allocate-memory (size)
   (make-memptr :mem (make-array size :adjustable t :initial-element 0)))
