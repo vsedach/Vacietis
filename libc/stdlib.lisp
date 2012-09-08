@@ -3,15 +3,15 @@
 
 ;;; allocation
 
-(defun malloc (size)
+(defun/1 malloc (size)
   (if (= size 0)
       NULL
       (allocate-memory size)))
 
-(defun calloc (count size)
+(defun/1 calloc (count size)
   (malloc (* count size)))
 
-(defun realloc (memory size)
+(defun/1 realloc (memory size)
   (cond ((eql memory NULL)
          (malloc size))
         ((= size 0)
@@ -21,7 +21,7 @@
          (adjust-array (memptr-mem memory) size :initial-element 0)
          memory)))
 
-(defun free (memory)
+(defun/1 free (memory)
   (unless (eql NULL memory)
     (setf (memptr-mem memory) 'FREED_BY_FREE)))
 
@@ -29,25 +29,25 @@
 
 (defconstant RAND_MAX most-positive-fixnum)
 
-(defun rand ()
+(defun/1 rand ()
   (random RAND_MAX))
 
-(defun srand (state) ;; todo
+(defun/1 srand (state) ;; todo
   (error "FIGURE OUT WHAT TO DO W/RANDOM STATES")
   (setf *random-state* state))
 
 ;;; numeric conversion
 
-(defun atoi (str)
+(defun/1 atoi (str)
   (parse-integer (char*-to-string str) :junk-allowed t))
 
-(defun atol (str)
+(defun/1 atol (str)
   (atoi str))
 
-(defun atoll (str)
+(defun/1 atoll (str)
   (atoi str))
 
-(defun atof (str)
+(defun/1 atof (str)
   (let* ((str   (char*-to-string str))
          (start (position-if (lambda (c)
                                (not (find c '(#\Space #\Tab #\Newline))))
@@ -62,7 +62,7 @@
                          str
                          :start start))))
 
-(defun strtod (str end-ptr)
+(defun/1 strtod (str end-ptr)
   (multiple-value-bind (number end)
       (read-from-string (char*-to-string str))
     (if (numberp number)
@@ -75,13 +75,13 @@
                 errno            ERANGE)
           0))))
 
-(defun strtof (a b)
+(defun/1 strtof (a b)
   (strtod a b))
 
-(defun strtold (a b)
+(defun/1 strtold (a b)
   (strtod a b))
 
-(defun strtol (str end-ptr base)
+(defun/1 strtol (str end-ptr base)
   (multiple-value-bind (number end)
       ;; fixme for octals
       (parse-integer (char*-to-string str)
@@ -99,13 +99,13 @@
                 errno            ERANGE)
           0))))
 
-(defun strtoll (a b c)
+(defun/1 strtoll (a b c)
   (strtol a b c))
 
-(defun strtoul (a b c)
+(defun/1 strtoul (a b c)
   (strtol a b c))
 
-(defun strtoull (a b c)
+(defun/1 strtoull (a b c)
   (strtol a b c))
 
 ;;; program environment
@@ -113,28 +113,28 @@
 (define EXIT_SUCCESS 0)
 (define EXIT_FAILURE 1)
 
-(defun abort ()
+(defun/1 abort ()
   (throw 'vacietis::c-exit EXIT_FAILURE))
 
 (defvar *exit-functions* ())
 
-(defun exit (status)
+(defun/1 exit (status)
   (dolist (f *exit-functions*)
     (funcall f))
   ;; close streams
   ;; delete tmpfiles
   (throw 'vacietis::c-exit status))
 
-(defun atexit (f)
+(defun/1 atexit (f)
   (push f *exit-functions*))
 
-(defun getenv (name)
+(defun/1 getenv (name)
   (gethash name vacietis::*environment* NULL))
 
-(defun setenv (name value)
+(defun/1 setenv (name value)
   (setf (gethash name vacietis::*environment*) value))
 
-(defun system (command) ;; this could be eval
+(defun/1 system (command) ;; this could be eval
   (declare (ignore command))
   0)
 
@@ -143,7 +143,7 @@
 
 ;;; some math functions
 
-(defun labs (x)
+(defun/1 labs (x)
   (abs x))
 
 ;; need structs for div/ldiv

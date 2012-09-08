@@ -14,7 +14,7 @@
             ((:file "package")
              (:file "state")
              (:file "implementation")
-             (:file "include")
+             (:file "libc-support")
              (:file "reader")))
    (:module :libc
             :serial t
@@ -22,14 +22,15 @@
             ((:file "package")
              (:file "errno")
              (:file "stddef")
+             (:file "stdarg")
+             (:static-file "stdarg.h")
              (:file "ctype")
              (:file "math")
              (:file "stdio")
+             (:static-file "scanf.c")
              (:file "stdlib")
              (:file "string")
-             (:static-file "string.c")
-             (:file "stdarg")
-             (:static-file "stdarg.h"))
+             (:static-file "string.c"))
             :depends-on (:compiler))
    (:module :runtime
             :components

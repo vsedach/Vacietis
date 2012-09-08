@@ -32,7 +32,7 @@ I am 72 inches tall.
 
 (program-test kr-echo :input "foobar" :output "foobar")
 
-(program-test hanly-83 ;; modify when scanf is added
+(program-test hanly-83
               :output
               "Enter 8 numbers separated by blanks or <return>s
 > The mean is 2.00.
@@ -94,11 +94,26 @@ Index    Item    Difference
 300  148.9
 ")
 
-;; needs scanf
-;; (program-test hanly-113
-;;               :input "200"
-;;               :output "321.8")
+(program-test hanly-113
+              :input "200"
+              :output "Enter the distance in miles> That equals 321.8 kilometers.
+")
 
+(program-test hanly-83-scanf
+              :input "16 12 6 8 2.5 12 14 -54.5"
+              :output
+              "Enter 8 numbers separated by blanks or <return>s
+> The mean is 2.00.
+The standard deviation is 21.75.
 
-
-
+Table of differences between data values and mean
+Index    Item    Difference
+  0        16.00         14.00
+  1        12.00         10.00
+  2         6.00          4.00
+  3         8.00          6.00
+  4         2.50          0.50
+  5        12.00         10.00
+  6        14.00         12.00
+  7       -54.50        -56.50
+")

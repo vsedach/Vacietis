@@ -331,10 +331,8 @@ result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
   "void main () {
 int x;
 }"
-  (cl:progn
-    (cl:defun main ()
-      (cl:prog* ((x 0))))
-    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main))))
+  (vacietis::defun/1 main ()
+    (cl:prog* ((x 0))))
   )
 
 (reader-test function-comments0
@@ -342,10 +340,8 @@ int x;
 /* this is a comment */
 int x;
 }"
-  (cl:progn
-    (cl:defun main ()
-     (cl:prog* ((x 0))))
-    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main))))
+  (vacietis::defun/1 main ()
+    (cl:prog* ((x 0))))
   )
 
 (reader-test function-comments1
@@ -354,10 +350,8 @@ int x;
 int x;
 // this is another comment
 }"
-  (cl:progn
-    (cl:defun main ()
-      (cl:prog* ((x 0))))
-    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main))))
+  (vacietis::defun/1 main ()
+    (cl:prog* ((x 0))))
   )
 
 (reader-test while0
@@ -383,12 +377,10 @@ fahr = fahr + step;
 printf(\"hello, world\\n\");
 }
 "
-  (cl:progn
-    (cl:defun main ()
-      (cl:prog* ()
-         (printf (string-to-char* "hello, world
-"))))
-    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main)))))
+  (vacietis::defun/1 main ()
+    (cl:prog* ()
+       (printf (string-to-char* "hello, world
+")))))
 
 (reader-test c99-style-for-init
   "for (int x = 0; x < 10; x++)
@@ -414,12 +406,10 @@ x++;"
 
 (reader-test empty-label
   "int main () { end:; }"
-  (cl:progn
-    (cl:defun main ()
-     (cl:prog* ()
-      end
-      cl:nil))
-    (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main)))))
+  (vacietis::defun/1 main ()
+    (cl:prog* ()
+     end
+     cl:nil)))
 
 (reader-test h&s-while2
   "while ( *char_pointer++ );"
@@ -580,13 +570,11 @@ x++;"
 static short s;
 auto short *sp = &s + 3, *msp = &s - 3;
 }"
-  (cl:progn
-      (cl:defun main ()
-        (cl:prog* ((msp 0) (sp 0) (s 0))
-           (cl:progn
-             (= sp (+ (mkptr& s) 3))
-             (= msp (- (mkptr& s) 3)))))
-      (cl:setf (cl:symbol-value 'main) (mkptr& (cl:symbol-function 'main)))))
+  (vacietis::defun/1 main ()
+    (cl:prog* ((msp 0) (sp 0) (s 0))
+       (cl:progn
+         (= sp (+ (mkptr& s) 3))
+         (= msp (- (mkptr& s) 3))))))
 
 (reader-test deref-op-precedence
   "&p + 1;"
@@ -599,7 +587,7 @@ auto short *sp = &s + 3, *msp = &s - 3;
 (reader-test preprocessor-define-template-noargs
   "#define getchar()  getc(stdin)
 getchar();"
-  cl:nil (getc stdin))
+  (getc stdin))
 
 (reader-test simple-struct1
   "struct complex {
@@ -623,11 +611,9 @@ double imag;
 {
    return 2;
 }"
-  (cl:progn
-    (cl:defun strrchr (s c)
-      (cl:prog* cl:nil
-         (cl:return 2)))
-    (cl:setf (cl:symbol-value 'strrchr) (mkptr& (cl:symbol-function 'strrchr)))))
+  (vacietis::defun/1 strrchr (s c)
+    (cl:prog* cl:nil
+       (cl:return 2))))
 
 (reader-test deref-exp
   "*(foo + 1)"

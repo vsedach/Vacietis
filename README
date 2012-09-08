@@ -95,7 +95,7 @@ compiler and libc.
   ----
 - struct accessors
 - enums
-- libc stdio: scanf, binary streams
+- libc stdio: binary streams
 - libc stddef: offsetof
 - libc signal
 - libc stdlib: div/ldiv, srand, exit cleanup

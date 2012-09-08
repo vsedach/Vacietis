@@ -25,6 +25,7 @@
    #:run-c-program
    )
   (:intern
+   #:defun/1
    #:compiler-state-pp
    #:compiler-state-typedefs
    #:compiler-state-structs
@@ -42,6 +43,7 @@
 (defpackage #:vacietis.reader
   (:use #:cl #:named-readtables #:vacietis #:anaphora)
   (:import-from #:vacietis
+    #:defun/1
     #:compiler-state-pp
     #:compiler-state-typedefs
     #:compiler-state-structs

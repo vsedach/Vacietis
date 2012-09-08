@@ -176,21 +176,33 @@
      (tagbody ,@(awhen initialization (list it))
       loop
         (when (eql 0 ,test)
-          (go break))
+          (go vacietis.c:break))
         ,body
-      continue
+      vacietis.c:continue
         ,@(awhen increment (list it))
         (go loop)
-      break)))
+      vacietis.c:break)))
 
 (defmacro vacietis.c:do (body test)
   `(tagbody loop
       ,body
-    continue
+    vacietis.c:continue
       (if (eql 0 ,test)
-          (go break)
+          (go vacietis.c:break)
           (go loop))
-    break))
+    vacietis.c:break))
+
+;;; switch
+
+(defmacro vacietis.c:switch (exp cases body)
+  `(tagbody
+      (case ,exp
+        ,@(mapcar (lambda (x) `(,x (go ,x))) cases)
+        (t (go ,(if (find 'vacietis.c:default body)
+                    'vacietis.c:default
+                    'vacietis.c:break))))
+      ,@body
+      vacietis.c:break))
 
 ;;; structs
 

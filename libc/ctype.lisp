@@ -2,10 +2,12 @@
 (in-readtable vacietis:vacietis)
 
 (defmacro chartest (cname exp)
-  `(defun ,cname (code)
-     (let ((c (code-char code)))
-       (declare (ignorable c))
-       (if ,exp 1 0))))
+  `(defun/1 ,cname (code)
+     (if (<= 0 code)
+         (let ((c (code-char code)))
+           (declare (ignorable c))
+           (if ,exp 1 0))
+         0)))
 
 (defun space? (c)
   (member c '(#\Space #\Newline #\Return #\Tab))) ;; vertical tab
@@ -24,8 +26,8 @@
 (chartest isupper (upper-case-p c))
 (chartest isxdigit (digit-char-p c 16))
 
-(defun toupper (c)
+(defun/1 toupper (c)
   (char-upcase (code-char c)))
 
-(defun tolower (c)
+(defun/1 tolower (c)
   (char-downcase (code-char c)))

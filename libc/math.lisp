@@ -3,34 +3,34 @@
 
 (define HUGE_VAL most-positive-double-float)
 
-(defun atan2 (x y)
+(defun/1 atan2 (x y)
   (atan x y))
 
-(defun pow (x y)
+(defun/1 pow (x y)
   (expt x y))
 
-(defun log10 (x)
+(defun/1 log10 (x)
   (log x 10))
 
-(defun fabs (x)
+(defun/1 fabs (x)
   (abs x))
 
-(defun ceil (x)
+(defun/1 ceil (x)
   (ceiling x))
 
-(defun fmod (x y)
+(defun/1 fmod (x y)
   (mod x y))
 
-(defun modf (x ptr)
+(defun/1 modf (x ptr)
   (multiple-value-bind (whole part)
       (fround x)
     (setf (deref* ptr) whole)
     part))
 
-(defun ldexp (x n)
+(defun/1 ldexp (x n)
   (* x (expt 2 n)))
 
-(defun frexp (x nptr)
+(defun/1 frexp (x nptr)
   (let ((n (ceiling (log (abs x) 2))))
     (setf (deref* nptr) n)
     (/ x (expt 2 n))))

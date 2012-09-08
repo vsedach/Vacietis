@@ -53,7 +53,7 @@
   `(defpackage ,name
      (:use #:cl #:named-readtables #:vacietis
            #:vacietis.libc.errno.h #:vacietis.libc.stddef.h)
-     (:import-from #:vacietis #:define)
+     (:import-from #:vacietis #:define #:defun/1 #:libc-dir #:load-libc-file)
      (:import-from #:vacietis.c #:deref* #:mkptr&)
      ,@other-opts))
 
@@ -131,9 +131,46 @@
    #:va_end
    #:va_copy))
 
+(deflibcpkg #:vacietis.libc.stdlib.h
+  (:shadow #:abort)
+  (:export
+   #:malloc
+   #:calloc
+   #:realloc
+   #:free
+   #:RAND_MAX
+   #:rand
+   #:srand
+   #:atoi
+   #:atol
+   #:atoll
+   #:atof
+   #:strtod
+   #:strtof
+   #:strtol
+   #:strtoll
+   #:strtoul
+   #:strtoull
+   #:EXIT_SUCCESS
+   #:EXIT_FAILURE
+   #:abort
+   #:exit
+   #:atexit
+   #:getenv
+   #:setenv
+   #:system
+   #:abs
+   #:labs
+   #:bsearch
+   #:qsort
+   #:div
+   #:ldiv
+   ))
+
 (deflibcpkg #:vacietis.libc.stdio.h
   (:shadow #:remove)
   (:import-from #:vacietis.libc.string.h #:strerror)
+  (:shadowing-import-from #:vacietis.libc.stdlib.h #:abort)
   (:export
    #:EOF
    #:stdin
@@ -177,40 +214,9 @@
    #:fprintf
    #:printf
    #:sprintf
+   #:scanf
+   #:fscanf
+   #:sscanf
    ))
 
-(deflibcpkg #:vacietis.libc.stdlib.h
-  (:shadow #:abort)
-  (:export
-   #:malloc
-   #:calloc
-   #:realloc
-   #:free
-   #:RAND_MAX
-   #:rand
-   #:srand
-   #:atoi
-   #:atol
-   #:atoll
-   #:atof
-   #:strtod
-   #:strtof
-   #:strtol
-   #:strtoll
-   #:strtoul
-   #:strtoull
-   #:EXIT_SUCCESS
-   #:EXIT_FAILURE
-   #:abort
-   #:exit
-   #:atexit
-   #:getenv
-   #:setenv
-   #:system
-   #:abs
-   #:labs
-   #:bsearch
-   #:qsort
-   #:div
-   #:ldiv
-   ))
+

@@ -37,11 +37,13 @@
 
 (cl:in-package #:vacietis.reader)
 
-;;; this makes things a lot less hairy
-
 (defvar %in)
 (defvar *c-file* nil)
 (defvar *line-number*  nil)
+
+;;; a C macro can expand to several statements; READ should return all of them
+
+(defvar *macro-stream*)
 
 ;;; error reporting
 
@@ -342,7 +344,7 @@
            (read-error "Misplaced #elif")))
       (otherwise ;; line, pragma, error ignored for now
        (pp-read-line))))
-  nil)
+  (values))
 
 ;;; infix
 
@@ -487,6 +489,7 @@
   (read-c-exp (next-char)))
 
 (defvar *variable-declarations*)
+(defvar *cases*)
 (defvar *local-sizes* nil)
 
 (defun read-exps-until (predicate)
@@ -530,20 +533,32 @@
               if-exp
               `(progn ,if-exp ,(%read-c-statement next-token))))
         (case statement
+          ((vacietis.c:break vacietis.c:continue)
+            `(go ,statement))
           (vacietis.c:goto
             `(go ,(read-c-statement (next-char))))
           (vacietis.c:return
             `(return ,(or (read-c-statement (next-char)) 0)))
+          (vacietis.c:case
+            (prog1 (car (push
+                         (eval (parse-infix (next-exp))) ;; must be constant int
+                         *cases*))
+              (unless (eql #\: (next-char))
+                (read-error "Error parsing case statement"))))
+          (vacietis.c:switch
+            (let* ((exp     (parse-infix (next-exp)))
+                   (*cases* ())
+                   (body    (read-c-block (next-char))))
+              `(vacietis.c:switch ,exp ,*cases* ,body)))
           (vacietis.c:while
             `(vacietis.c:for (nil nil ,(parse-infix (next-exp)) nil)
                ,(read-block-or-statement)))
           (vacietis.c:do
-           (let ((body (read-block-or-statement)))
-             (if (eql (next-exp) 'vacietis.c:while)
-                 (prog1
-                     `(vacietis.c:do ,body ,(parse-infix (next-exp)))
-                   (read-c-statement (next-char))) ;; semicolon
-                 (read-error "No 'while' following a 'do'"))))
+            (let ((body (read-block-or-statement)))
+              (if (eql (next-exp) 'vacietis.c:while)
+                  (prog1 `(vacietis.c:do ,body ,(parse-infix (next-exp)))
+                    (read-c-statement (next-char))) ;; semicolon
+                  (read-error "No 'while' following a 'do'"))))
           (vacietis.c:for
             `(vacietis.c:for
                  ,(let* ((*local-sizes*           (make-hash-table))
@@ -586,16 +601,12 @@
                        (strip-type x))))))))
     (if (eql (peek-char nil %in) #\;)
         (prog1 t (c-read-char)) ;; forward declaration
-        `(progn
-           (defun ,name ,(reverse arglist)
-             ,(let* ((*variable-declarations* ())
-                     (*local-sizes*           (make-hash-table))
-                     (body                    (read-c-block (next-char))))
-               `(prog* ,*variable-declarations*
-                   ,@body)))
-
-           (setf (symbol-value ',name)
-                 (vacietis.c:mkptr& (symbol-function ',name)))))))
+        `(defun/1 ,name ,(reverse arglist)
+           ,(let* ((*variable-declarations* ())
+                   (*local-sizes*           (make-hash-table))
+                   (body                    (read-c-block (next-char))))
+              `(prog* ,*variable-declarations*
+                  ,@body))))))
 
 ;; fixme: shit code
 (defun process-variable-declaration (spec type)
@@ -705,8 +716,10 @@
                                          (read-infix-exp token))))))
 
 (defun read-c-statement (c)
-  (unless (eql #\; c)
-    (%read-c-statement (read-c-exp c))))
+  (case c
+    (#\# (read-c-macro %in c))
+    (#\; (values))
+    (t   (%read-c-statement (read-c-exp c)))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
@@ -751,14 +764,15 @@
             ((or (eql c #\_) (alpha-char-p c))
              (let ((symbol (read-c-identifier c)))
                (aif (gethash symbol (compiler-state-pp *compiler-state*))
-                    (progn (setf %in
-                                 (make-concatenated-stream
-                                  (make-string-input-stream
-                                   (etypecase it
-                                     (string it)
-                                     (function
-                                      (funcall it (c-read-delimited-strings)))))
-                                  %in))
+                    (progn (setf *macro-stream*
+                                 (make-string-input-stream
+                                  (etypecase it
+                                    (string
+                                     it)
+                                    (function
+                                     (funcall it (c-read-delimited-strings)))))
+                                 %in
+                                 (make-concatenated-stream *macro-stream* %in))
                            (read-c-exp (next-char)))
                     symbol)))
             (t
@@ -773,7 +787,14 @@
 ;;; readtable
 
 (defun read-c-toplevel (%in c)
-  (read-c-statement c))
+  (let* ((*macro-stream* nil)
+         (exp1           (read-c-statement c)))
+    (if (and *macro-stream* (peek-char t *macro-stream* nil))
+        (list* 'progn
+               exp1
+               (loop while (peek-char t *macro-stream* nil)
+                     collect (read-c-statement (next-char))))
+        (or exp1 (values)))))
 
 (macrolet
     ((def-c-readtable ()

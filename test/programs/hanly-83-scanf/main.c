@@ -6,7 +6,7 @@
 int
 main(void)
 {
-  double x[MAX_ITEM] = { 16, 12, 6, 8, 2.5, 12, 14, -54.5 },
+  double x[MAX_ITEM],
     mean,
     st_dev,
     sum,
@@ -15,6 +15,8 @@ main(void)
 
   printf("Enter %d numbers separated by blanks or <return>s\n> ",
          MAX_ITEM);
+  for  (i = 0;  i < MAX_ITEM;  ++i)
+    scanf("%lf", &x[i]);
 
   sum = 0;
   sum_sqr = 0;

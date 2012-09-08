@@ -15,7 +15,7 @@
 (defvar stdout (make-instance 'FILE :stream *standard-output*))
 (defvar stderr (make-instance 'FILE :stream *error-output*))
 
-(defun clearerr (fd)
+(defun/1 clearerr (fd)
   (setf (feof fd)   0
         (ferror fd) 0))
 
@@ -36,7 +36,7 @@
                                          :if-does-not-exist :create)))))
     (apply #'open (char*-to-string filename) opts)))
 
-(defun fopen (filename mode)
+(defun/1 fopen (filename mode)
   (handler-case (make-instance 'FILE :stream (open-stream filename mode))
     (file-error ()
       (setf errno ENOENT)
@@ -44,19 +44,19 @@
     (error ()
       NULL)))
 
-(defun fflush (fd)
+(defun/1 fflush (fd)
   (unless (eql fd NULL)
     (finish-output (fd-stream fd)))
   0)
 
-(defun fclose (fd)
+(defun/1 fclose (fd)
   (close (fd-stream fd))
   (when (tmp-file fd)
     (delete-file (tmp-file fd))
     (setf (tmp-file fd) nil))
   0)
 
-(defun freopen (filename mode fd)
+(defun/1 freopen (filename mode fd)
   (handler-case (progn (fclose fd)
                        (clearerr fd)
                        (setf (fd-stream fd) (open-stream filename mode)))
@@ -64,17 +64,17 @@
       (setf errno EIO)
       NULL)))
 
-(defun remove (filename)
+(defun/1 remove (filename)
   (handler-case (progn (delete-file (char*-to-string filename))
                        0)
     (file-error () 1)))
 
-(defun rename (oldname newname)
+(defun/1 rename (oldname newname)
   (handler-case (progn (rename-file oldname newname)
                        0)
     (file-error () 1)))
 
-(defun tmpfile ()
+(defun/1 tmpfile ()
   (let ((path (merge-pathnames (symbol-name (gensym "vac_tmp_c_file"))
                                "/tmp/")))
     (if (open path :direction :probe)
@@ -87,7 +87,7 @@
           ;; good idea to attach finalizers to the tmp files' streams too
           fd))))
 
-(defun tmpnam (str)
+(defun/1 tmpnam (str)
   (let ((newname (string-to-char* (symbol-name (gensym)))))
    (if (eql str NULL)
        newname
@@ -96,7 +96,7 @@
 
 ;;; character I/O
 
-(defun fgetc (fd)
+(defun/1 fgetc (fd)
   (handler-case (char-code (read-char (fd-stream fd)))
     (end-of-file ()
       (setf (feof fd) 1)
@@ -105,23 +105,23 @@
       (setf (ferror fd) EIO)
       EOF)))
 
-(defun getc (fd)
+(defun/1 getc (fd)
   (fgetc fd))
 
-(defun getchar ()
+(defun/1 getchar ()
   (getc stdin))
 
-(defun fputc (c fd)
+(defun/1 fputc (c fd)
   (handler-case (progn (write-char (code-char c) (fd-stream fd))
                        c)
     (error ()
       (setf (ferror fd) EIO)
       EOF)))
 
-(defun putc (c fd)
+(defun/1 putc (c fd)
   (fputc c fd))
 
-(defun putchar (c)
+(defun/1 putchar (c)
   (fputc c stdout))
 
 (defun fgets-is-dumb (str n fd replace-newline?)
@@ -142,27 +142,27 @@
       (setf (ferror fd) EIO)
       NULL)))
 
-(defun fgets (str n fd)
+(defun/1 fgets (str n fd)
   (fgets-is-dumb str n fd nil))
 
-(defun gets (str)
+(defun/1 gets (str)
   (fgets-is-dumb str most-positive-fixnum stdin t))
 
-(defun fputs (str fd)
+(defun/1 fputs (str fd)
   (handler-case (progn (write-string (char*-to-string str) (fd-stream fd))
                        0)
     (error ()
       (setf (ferror fd) EIO)
       EOF)))
 
-(defun puts (str)
+(defun/1 puts (str)
   (when (eql EOF (fputs str stdout))
     (return-from puts EOF))
   (when (eql EOF (fputc #\Newline stdout))
     (return-from puts EOF))
   0)
 
-(defun ungetc (c fd)
+(defun/1 ungetc (c fd)
   (handler-case (progn (unread-char (code-char c) (fd-stream fd))
                        c)
     (error ()
@@ -171,7 +171,7 @@
 
 ;;; fread/fwrite, only work for byte arrays for now
 
-(defun fread (mem element_size count fd)
+(defun/1 fread (mem element_size count fd)
   (handler-case
       (let* ((start    (memptr-ptr mem))
              (end      (+ start (* element_size count)))
@@ -184,7 +184,7 @@
       (setf (ferror fd) EIO)
       0)))
 
-(defun fwrite (mem element_size count fd)
+(defun/1 fwrite (mem element_size count fd)
   (handler-case
       (let ((start (memptr-ptr mem)))
         (write-sequence (memptr-mem mem) (fd-stream fd)
@@ -200,7 +200,7 @@
 (define SEEK_CUR 1)
 (define SEEK_END 2)
 
-(defun fseek (fd offset origin) ;; dumbest function in stdio
+(defun/1 fseek (fd offset origin) ;; dumbest function in stdio
   (handler-case
       (let ((stream (fd-stream fd)))
         (file-position stream (case origin
@@ -213,14 +213,14 @@
       (setf (ferror fd) ESPIPE) ;; is this the right error code?
       1)))
 
-(defun ftell (fd)
+(defun/1 ftell (fd)
   (or (file-position (fd-stream fd)) -1))
 
-(defun rewind (fd)
+(defun/1 rewind (fd)
   (fseek fd 0 0)
   (clearerr fd))
 
-(defun fgetpos (fd pos_ptr)
+(defun/1 fgetpos (fd pos_ptr)
   (let ((pos (file-position (fd-stream fd))))
     (if pos
         (progn (setf (deref* pos_ptr) pos)
@@ -228,7 +228,7 @@
         (progn (setf errno ENOTTY)
                1))))
 
-(defun fsetpos (fd pos_ptr)
+(defun/1 fsetpos (fd pos_ptr)
   (handler-case (progn (if (file-position (fd-stream fd) (deref* pos_ptr))
                            0
                            (progn (setf errno ESPIPE)
@@ -314,7 +314,7 @@
             (spacep    (write-char #\Space stream)))
       (write-string buffer stream))))
 
-(defun fprintf (fd fmt &rest args)
+(defun/1 fprintf (fd fmt &rest args)
   "Prints ARGS to FD according to FMT.
    Characters in FMT are just copied to the output, except for %, which introduces
    a directive.  A directive has the following syntax:
@@ -444,10 +444,10 @@
                   (write-char char stream)))))
             (write-char (code-char ch) stream))))))
 
-(defun printf (fmt &rest args)
+(defun/1 printf (fmt &rest args)
   (apply #'fprintf stdout fmt args))
 
-(defun sprintf (str fmt &rest args)
+(defun/1 sprintf (str fmt &rest args)
   (replace
    (memptr-mem str)
    (memptr-mem
@@ -457,22 +457,26 @@
    :start1 (memptr-ptr str))
   str)
 
-(defun snprintf (string max-length fmt &rest args)
+(defun/1 snprintf (string max-length fmt &rest args)
   (error "NOT IMPLEMENTED YET"))
 
-(defun perror (str)
+(defun/1 perror (str)
   (if (or (eql NULL str)
           (eql 0 (aref (memptr-mem str) (memptr-ptr str))))
       (fprintf stderr (string-to-char* "%s\\n") (strerror errno))
       (fprintf stderr (string-to-char* "%s: %s\\n") str (strerror errno))))
 
+;;; scanf
+
+(load-libc-file "scanf.c" #.(libc-dir))
+
 ;;; things that have no effect
 
-(defun setvbuf (fd buf mode size)
+(defun/1 setvbuf (fd buf mode size)
   (declare (ignore fd buf mode size))
   0)
 
-(defun setbuf (fd buf)
+(defun/1 setbuf (fd buf)
   (declare (ignore fd buf))
   0)
 
