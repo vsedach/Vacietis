@@ -8,4 +8,4 @@
             :serial t
             :components ((:file "package")
                          (:file "vcc"))))
-  :depends-on (:vacietis))
+  :depends-on (:vacietis :trivial-dump-core))

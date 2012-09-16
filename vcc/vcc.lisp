@@ -1,34 +1,35 @@
 (in-package #:vacietis.vcc)
 
-#-ccl (error "VCC only supports Clozure Common Lisp for now.")
+#-(or sbcl ccl clisp) (error "VCC only supports CCL, SBCL, and CLISP at this time.")
 
 (defun del (file)
   (when (probe-file file)
     (delete-file file)))
 
+(defun getargv ()
+  #+sbcl sb-ext:*posix-argv*
+  #+ccl ccl:*command-line-argument-list*
+  #+cmucl *command-line-strings*
+  #+clisp (ext:argv)
+  #+ecl (ext:command-args))
+
+(defun make-executable (path &key (toplevel #'main))
+  (del path)
+  (trivial-dump-core:save-executable path :init-function toplevel))
+
 (defun main ()
-  (let* ((c-file    (second cl-user::*command-line-argument-list*))
+  (let* ((c-file    (second (getargv)))
          (c-package (make-package (format nil "~A.PROGRAM"
                                           (string-upcase
                                            (file-namestring c-file)))
                                   :use ())))
     (let ((*package* c-package))
       (load-c-file c-file))
-    (del "a.out")
-    (ccl:save-application
-     "a.out"
-     :toplevel-function (lambda ()
-                          (run-c-program c-package))
-     :error-handler     :quit
-     :prepend-kernel    t)))
+    (make-executable "a.out" :toplevel (lambda ()
+                                         (run-c-program c-package)))))
 
 (let ((vcc-out (merge-pathnames
                 "vcc"
                 #.(directory-namestring
                    (or *load-truename* *compile-file-truename*)))))
-  (del vcc-out)
-  (ccl:save-application
-   vcc-out
-   :toplevel-function #'main
-   :error-handler     :quit
-   :prepend-kernel    t))
+  (make-executable vcc-out))
