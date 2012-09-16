@@ -4,7 +4,7 @@
   :name "vacietis"
   :author "Vladimir Sedach <vsedach@gmail.com>"
   :description "C to Common Lisp compiler"
-  :licence "LLGPLv3"
+  :licence "LLGPL v3 or later"
   :components
   ((:static-file "vacietis.asd")
    (:static-file "vacietis.test.asd")
