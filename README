@@ -42,13 +42,13 @@ information before calling LOAD:
 
 (vacietis:load-c-file "/foo/bar/file.c")
 
+
 * COMPILER EXECUTABLE:
   -------------------
 
 The system vacietis.vcc produces a toy C compiler executable that can
 take a single-file C program and produce an executable
-program. Currently it requires Clozure Common Lisp to work. Sample
-run:
+program. Currently it needs CCL, CLISP, or SBCL to work. Sample run:
 
 (ql:quickload "vacietis.vcc") will produce the executable vcc/vcc in
 the Vacietis source directory.
@@ -60,6 +60,7 @@ Produces the file a.out in the current directory.
 $ ./a.out
 Enter 8 numbers separated by blanks or <return>s
 >
+
 
 * TECHNICAL DETAILS:
   -----------------
