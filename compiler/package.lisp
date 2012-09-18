@@ -29,6 +29,7 @@
    #:compiler-state-pp
    #:compiler-state-typedefs
    #:compiler-state-structs
+   #:compiler-state-enums
    #:compiler-state-var-sizes))
 
 (in-package #:vacietis)
@@ -47,6 +48,7 @@
     #:compiler-state-pp
     #:compiler-state-typedefs
     #:compiler-state-structs
+    #:compiler-state-enums
     #:compiler-state-var-sizes))
 
 (defpackage #:vacietis.c

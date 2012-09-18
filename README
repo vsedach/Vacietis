@@ -113,7 +113,8 @@ compiler and libc.
 * TODO:
   ----
 - struct accessors
-- enums
+- enums: assignment of arbitrary values to enum labels
+- implement overloading class scope correctly (see H&S p. 147)
 - libc stdio: binary streams
 - libc stddef: offsetof
 - libc signal

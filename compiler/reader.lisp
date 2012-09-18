@@ -482,7 +482,7 @@
   ;; and also do checks for struct, union, enum and typedef types
   (or (type-qualifier? identifier)
       (basic-type?     identifier)
-      (member  identifier '(vacietis.c:struct))
+      (member  identifier '(vacietis.c:struct vacietis.c:enum))
       (gethash identifier (compiler-state-typedefs *compiler-state*))))
 
 (defun next-exp ()
@@ -676,6 +676,18 @@
     (#\, (read-typedef type (next-exp)))
     (#\; t)))
 
+(defun read-enum-decl ()
+  (when (eql #\{ (peek-char t %in))
+    (next-char)
+    (let ((enums (c-read-delimited-list #\{ #\,)))
+      ;; fixme: assigned values to enum names
+      (loop for name across enums for i from 0 do
+           (setf (gethash (elt name 0) (compiler-state-enums *compiler-state*))
+                 i))))
+  (if (eql #\; (peek-char t %in))
+      (progn (next-char) t)
+      (read-variable-declaration (read-c-exp (next-char)) 'vacietis.c:int)))
+
 (defun read-declaration (token)
   (when (or (c-type? token) (eq 'vacietis.c:typedef token))
     (let ((type     (unless (type-qualifier? token) token))
@@ -692,6 +704,8 @@
              (read-struct name))
             ((eq token 'vacietis.c:typedef)
              (read-typedef type name))
+            ((eq type 'vacietis.c:enum)
+             (read-enum-decl))
             (t
              (read-variable-declaration name (unless pointer? type)))))))
 
@@ -763,18 +777,22 @@
       (cond ((digit-char-p c) (read-c-number c))
             ((or (eql c #\_) (alpha-char-p c))
              (let ((symbol (read-c-identifier c)))
-               (aif (gethash symbol (compiler-state-pp *compiler-state*))
-                    (progn (setf *macro-stream*
-                                 (make-string-input-stream
-                                  (etypecase it
-                                    (string
-                                     it)
-                                    (function
-                                     (funcall it (c-read-delimited-strings)))))
-                                 %in
-                                 (make-concatenated-stream *macro-stream* %in))
-                           (read-c-exp (next-char)))
-                    symbol)))
+               (acond
+                 ((gethash symbol (compiler-state-pp *compiler-state*))
+                  (setf *macro-stream*
+                        (make-string-input-stream
+                         (etypecase it
+                           (string
+                            it)
+                           (function
+                            (funcall it (c-read-delimited-strings)))))
+                        %in
+                        (make-concatenated-stream *macro-stream* %in))
+                  (read-c-exp (next-char)))
+                 ((gethash symbol (compiler-state-enums *compiler-state*))
+                  it)
+                 (t
+                  symbol))))
             (t
              (case c
                (#\" (read-c-string %in c))

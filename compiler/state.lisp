@@ -7,4 +7,5 @@
   (pp        (make-hash-table))
   (typedefs  (make-hash-table))
   (structs   (make-hash-table))
+  (enums     (make-hash-table))
   (var-sizes (make-hash-table)))

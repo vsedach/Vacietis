@@ -271,3 +271,21 @@ foo();"
 }
 pow(3, 4);"
   81)
+
+(eval-test enums
+  "enum foo { bar, baz };
+enum foo x = bar;
+enum foo y = baz;
+int A = 0;
+
+if (x == bar) A = 3;
+A;"
+  3)
+
+(eval-test enums1
+  "enum foo { bar, baz } x = bar, y = baz;
+int A = 0;
+
+if (x == bar) A = 3;
+A;"
+  3)
