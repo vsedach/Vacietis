@@ -7,24 +7,21 @@
     (delete-file file)))
 
 (defun getargv ()
-  #+sbcl sb-ext:*posix-argv*
-  #+ccl ccl:*command-line-argument-list*
-  #+cmucl *command-line-strings*
-  #+clisp (ext:argv)
-  #+ecl (ext:command-args))
+  #+sbcl   sb-ext:*posix-argv*
+  #+ccl    ccl:*command-line-argument-list*
+  #+cmucl  *command-line-strings*
+  #+clisp  (ext:argv)
+  #+ecl    (ext:command-args))
 
 (defun make-executable (path &key (toplevel #'main))
   (del path)
-  (trivial-dump-core:save-executable path :init-function toplevel))
+  (trivial-dump-core:save-executable path toplevel))
 
 (defun main ()
-  (let* ((c-file    (second (getargv)))
-         (c-package (make-package (format nil "~A.PROGRAM"
-                                          (string-upcase
-                                           (file-namestring c-file)))
-                                  :use ())))
-    (let ((*package* c-package))
-      (load-c-file c-file))
+  (let* ((c-file     (second (getargv)))
+         (c-package  (find-package '#:vacietis.vcc.c-program))
+         (*package*  c-package))
+    (load-c-file c-file)
     (make-executable "a.out" :toplevel (lambda ()
                                          (run-c-program c-package)))))
 
