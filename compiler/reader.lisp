@@ -354,10 +354,15 @@
          ((gethash x (or *local-sizes*
                          (compiler-state-var-sizes *compiler-state*)))
           it)
-         ((gethash x (compiler-state-typedefs *compiler-state*))
-          (size-of it))
-         ((gethash x (compiler-state-structs *compiler-state*))
-          (length it))))
+         ((consp x)
+          (case (elt x 0)
+            (vacietis.c:typedef
+             (size-of (gethash (elt x 1)
+                               (compiler-state-typedefs *compiler-state*))))
+            (vacietis.c:struct
+             (gethash (elt x 1) (compiler-state-structs *compiler-state*)))
+            (t
+             (read-error "Don't know how size of ~A" x))))))
 
 (defun parse-infix (exp &optional (start 0) (end (when (vectorp exp) (length exp))))
   (if (vectorp exp)
@@ -437,10 +442,17 @@
                                       (otherwise     x))
                                     (parse-rest i))))))))
           ;; funcall, aref, and struct access
-          (loop for i from (1+ start) below end for x = (aref exp i) do
+          (loop for i from (1- end) downto (1+ start) for x = (aref exp i) do
                (cond
                  ((find x #(vacietis.c:|.| vacietis.c:->))
-                  (return-from parse-infix (parse-binary i)))
+                  (let ((exp (parse-binary i)))
+                    (return-from parse-infix
+                      `(vacietis.c:|.|
+                        ,(if (eq x 'vacietis.c:->)
+                             `(vacietis.c:deref* ,(elt exp 1))
+                             (elt exp 1))
+                        ,(gethash (elt exp 2)
+                                  (compiler-state-accessors *compiler-state*))))))
                  ((listp x) ;; aref
                   (return-from parse-infix
                     (if (eq (car x) 'vacietis.c:[])
@@ -482,7 +494,7 @@
   ;; and also do checks for struct, union, enum and typedef types
   (or (type-qualifier? identifier)
       (basic-type?     identifier)
-      (member  identifier '(vacietis.c:struct vacietis.c:enum))
+      (find identifier #(vacietis.c:struct vacietis.c:enum))
       (gethash identifier (compiler-state-typedefs *compiler-state*))))
 
 (defun next-exp ()
@@ -627,8 +639,8 @@
                               (compiler-state-var-sizes *compiler-state*)))
             (cond ((consp preallocated-value)
                    (second preallocated-value))
-                  ((consp type) ;; assume struct
-                   (let ((type-size (size-of (second type))))
+                  ((consp type)
+                   (let ((type-size (size-of type)))
                      (setf preallocated-value
                            `(vacietis:allocate-memory ,type-size))
                      type-size))
@@ -649,31 +661,10 @@
          (cons 'progn it)
          t)))
 
-(defun read-struct-slots (sc)
-  (case sc
-    (#\{ (loop for c = (next-char) until (eql c #\}) append
-              (loop for x = (read-c-exp c) then (next-exp)
-                    while (or (eql 'vacietis.c:* x) (c-type? x))
-                    finally (return (when x (list x))))))
-    (#\; nil) ;; forward declaration
-    (otherwise (read-error "Expected opening brace '{' but found '~A'" sc))))
-
-(defun read-struct (name)
-  (let* ((slots        (read-struct-slots (next-char)))
-         (declaration `(vacietis::c-struct ,name ,@slots)))
-    (when slots
-      (setf (gethash name (compiler-state-structs *compiler-state*)) slots)
-      (if (eql #\; (peek-char t %in))
-          (next-char)
-          (return-from read-struct
-            `(progn ,declaration
-                    ,(read-variable-declaration (next-exp) `(struct ,name))))))
-    declaration))
-
 (defun read-typedef (type name)
   (setf (gethash name (compiler-state-typedefs *compiler-state*)) type)
   (ecase (c-read-char)
-    (#\, (read-typedef type (next-exp)))
+    (#\, (read-typedef type (next-exp))) ;; is this right?
     (#\; t)))
 
 (defun read-enum-decl ()
@@ -688,24 +679,57 @@
       (progn (next-char) t)
       (read-variable-declaration (read-c-exp (next-char)) 'vacietis.c:int)))
 
+(defun read-place-description (type)
+  (loop while (type-qualifier? type)
+        do    (setf type (next-exp)))
+  (when (eq type 'vacietis.c:typedef)
+    (setf type (next-exp)))
+  (awhen (gethash type (compiler-state-typedefs *compiler-state*))
+    (setf type it))
+  (cond ((find type #(vacietis.c:struct vacietis.c:enum))
+         (values nil (list type (next-exp)) nil))
+        ((basic-type? type)
+         (let ((name     (next-exp))
+               (pointer? nil))
+           (loop while (eq name 'vacietis.c:*)
+                 do    (setf pointer? name
+                             name     (next-exp)))
+           (values name type pointer?)))))
+
+(defun read-struct (type)
+  (acase (next-char)
+    (#\{ (let ((i 0))
+           (loop for c = (next-char) until (eql #\} c) do
+                (multiple-value-bind (slot-name slot-type pointer?)
+                    (read-place-description (read-c-exp c))
+                  (setf slot-name (or slot-name (next-exp))
+                        (gethash
+                         slot-name (compiler-state-accessors *compiler-state*)) i
+                         i (+ i (if pointer? 1 (size-of slot-type))))
+                  (unless (eq #\; (next-char))
+                    (read-error "Error in struct declaration"))))
+           (setf (gethash (elt type 1) (compiler-state-structs *compiler-state*))
+                 i))
+         (if (eql #\; (peek-char t %in))
+             (progn (next-char) t)
+             (read-variable-declaration (next-exp) type)))
+    (#\* (slurp-while (lambda (c) (eql c #\*)))
+         (read-variable-declaration (next-exp) type))
+    (#\; t) ;; forward declaration
+    (t   (read-variable-declaration (read-c-exp it) type))))
+
 (defun read-declaration (token)
   (when (or (c-type? token) (eq 'vacietis.c:typedef token))
-    (let ((type     (unless (type-qualifier? token) token))
-          (pointer? nil)
-          (name     nil))
-      (loop for x = (next-exp) do
-           (cond ((eql 'vacietis.c:* x) (setf pointer? t))
-                 ((basic-type? x)       (setf type x))
-                 ((type-qualifier? x)   nil)
-                 (t                     (setf name x) (return))))
+    (multiple-value-bind (name type pointer?)
+        (read-place-description token)
       (cond ((eql #\( (peek-char t %in))
              (read-function name))
-            ((eq type 'vacietis.c:struct)
-             (read-struct name))
             ((eq token 'vacietis.c:typedef)
              (read-typedef type name))
-            ((eq type 'vacietis.c:enum)
-             (read-enum-decl))
+            ((consp type)
+             (ecase (elt type 0)
+               (vacietis.c:struct (read-struct type))
+               (vacietis.c:enum   (read-enum-decl))))
             (t
              (read-variable-declaration name (unless pointer? type)))))))
 

@@ -589,23 +589,6 @@ auto short *sp = &s + 3, *msp = &s - 3;
 getchar();"
   (getc stdin))
 
-(reader-test simple-struct1
-  "struct complex {
-double real;
-double imag;
-};"
-  (vacietis::c-struct complex real imag))
-
-(reader-test simple-struct-decl
-  "struct complex { double real; double imag; } x, y;"
-  (cl:progn (vacietis::c-struct complex real imag)
-            (cl:progn (cl:defparameter x (vacietis:allocate-memory 2))
-                      (cl:defparameter y (vacietis:allocate-memory 2)))))
-
-(reader-test struct-forward-declaration
-  "struct cell;"
-  (vacietis::c-struct cell))
-
 (reader-test function-returns-pointer
   "char *strrchr( const  char *s, int c)
 {

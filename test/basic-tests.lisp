@@ -289,3 +289,67 @@ int A = 0;
 if (x == bar) A = 3;
 A;"
   3)
+
+(eval-test struct1
+  "struct point {
+  int x;
+  int y;
+};
+
+struct point pt = { 7, 11 };
+pt.x + pt.y;"
+  18)
+
+(eval-test structs2
+  "struct point {
+  int x;
+  int y;
+};
+
+struct rect {
+  struct point pt1;
+  struct point pt2;
+};
+
+struct rect screen;
+
+screen.pt1.x = 3;
+screen.pt2.y = 5;
+
+screen.pt1.x + screen.pt2.y;"
+  8)
+
+(eval-test structs3
+  "struct point {
+  int x;
+  int y;
+};
+
+struct rect {
+  struct point pt1;
+  struct point pt2;
+};
+
+struct rect r, *rp = &r;
+
+r.pt2.y = 3;
+
+r.pt2.y + rp->pt2.y + (r.pt2).y + (rp->pt2).y;"
+  12)
+
+(eval-test ptr-addr-decl1
+  "int x, *y = &x;
+x = 3;
+x * *y;"
+  9)
+
+(eval-test struct-ptr-decl1
+  "struct point {
+  int x;
+  int y;
+} *foo, bar;
+
+bar.x = 7;
+foo = &bar;
+foo->x * (*foo).x;"
+  49)

@@ -29,6 +29,7 @@
    #:compiler-state-pp
    #:compiler-state-typedefs
    #:compiler-state-structs
+   #:compiler-state-accessors
    #:compiler-state-enums
    #:compiler-state-var-sizes))
 
@@ -48,6 +49,7 @@
     #:compiler-state-pp
     #:compiler-state-typedefs
     #:compiler-state-structs
+    #:compiler-state-accessors
     #:compiler-state-enums
     #:compiler-state-var-sizes))
 

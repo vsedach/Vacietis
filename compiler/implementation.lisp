@@ -86,6 +86,11 @@
 (defun (setf vacietis.c:[]) (new-value a i)
   (setf (aref (memptr-mem a) (+ (memptr-ptr a) i)) new-value))
 
+(defmacro vacietis.c:|.| (x i)
+  (if (and (consp x) (eq 'vacietis.c:|.| (elt x 0)))
+      `(vacietis.c:|.| ,(elt x 1) ,(+ (elt x 2) i))
+      `(vacietis.c:deref* (vacietis.c:+ ,x ,i))))
+
 ;;; arithmetic
 
 ;; things that operate on pointers: + - < > <= >= == != ++ -- !
@@ -203,9 +208,3 @@
                     'vacietis.c:break))))
       ,@body
       vacietis.c:break))
-
-;;; structs
-
-(defmacro c-struct (name slots)
-  ;; DEFINE ACCESSORS!!!
-  )
