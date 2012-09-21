@@ -114,6 +114,7 @@ compiler and libc.
   ----
 - enums: assignment of arbitrary values to enum labels
 - struct and array call by value
+- pass arguments to main()
 - implement overloading class scope correctly (see H&S p. 147)
 - libc stdio: binary streams
 - libc stddef: offsetof

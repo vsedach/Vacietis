@@ -671,6 +671,30 @@ getchar();"
 123;"
   123)
 
+(reader-test x**y
+  "x**y;"
+  (* x (deref* y)))
+
+(reader-test x+*y
+  "x+*y;"
+  (+ x (deref* y)))
+
+(reader-test x-*y
+  "x-*y;"
+  (- x (deref* y)))
+
+(reader-test x-*y
+  "x-**y;"
+  (- x (deref* (deref* y))))
+
+(reader-test x***y
+  "x***y;"
+  (* x (deref* (deref* y))))
+
+(reader-test x*-y
+  "x*-y;"
+  (* x (cl:- y)))
+
 ;; (reader-test array-of-array-of-ints
 ;;   "int foobar[5][5];")
 

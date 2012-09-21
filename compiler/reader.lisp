@@ -401,11 +401,18 @@
           ;; various binary operators
           (loop for table across *binary-ops-table* do
                (awhen (match-binary-ops table)
-                 (let ((prev (aref exp (1- it))))
-                   (unless (and (find (aref exp it) *ambiguous-ops*)
-                                (or (cast? prev)
-                                    (find prev *possible-prefix-ops*)))
-                     (return-from parse-infix (parse-binary it))))))
+                 (if (and (find (elt exp it) *ambiguous-ops*)
+                          (let ((prev (elt exp (1- it))))
+                            (or (find prev *ops*) (cast? prev))))
+                     (awhen (position-if (lambda (x)
+                                           (not (or (find x *ops*)
+                                                    (cast? x))))
+                                         exp
+                                         :start     start
+                                         :end          it
+                                         :from-end      t)
+                       (return-from parse-infix (parse-binary (1+ it))))
+                     (return-from parse-infix (parse-binary it)))))
           ;; unary operators
           (flet ((parse-rest (i)
                    (parse-infix exp (1+ i) end)))

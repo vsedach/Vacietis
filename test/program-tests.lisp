@@ -117,3 +117,7 @@ Index    Item    Difference
   6        14.00         12.00
   7       -54.50        -56.50
 ")
+
+(program-test ptr-decl1
+              :output "9
+")
