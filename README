@@ -112,6 +112,7 @@ compiler and libc.
 
 * TODO:
   ----
+- pointer arithmetic on pointers to structs and arrays
 - enums: assignment of arbitrary values to enum labels
 - struct and array call by value
 - pass arguments to main()
@@ -119,7 +120,7 @@ compiler and libc.
 - libc stdio: binary streams
 - libc stddef: offsetof
 - libc signal
-- libc stdlib: div/ldiv, srand, exit cleanup
+- libc stdlib: div/ldiv, srand, exit cleanup, bsearch, qsort
 - libc time
 - libc setjmp
 

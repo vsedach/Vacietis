@@ -121,3 +121,11 @@ Index    Item    Difference
 (program-test ptr-decl1
               :output "9
 ")
+
+(program-test hs-while-string-copy
+              :output "foobar
+")
+
+(program-test pointer-lvalue2
+              :output "5
+")

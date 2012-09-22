@@ -349,7 +349,7 @@
 ;;; infix
 
 (defun size-of (x)
-  (acond ((member x *basic-c-types*)
+  (acond ((or (member x *basic-c-types*) (eq x 'vacietis.c:*))
           1)
          ((gethash x (or *local-sizes*
                          (compiler-state-var-sizes *compiler-state*)))
@@ -627,31 +627,41 @@
               `(prog* ,*variable-declarations*
                   ,@body))))))
 
-;; fixme: shit code
 (defun process-variable-declaration (spec type)
-  (let (name (preallocated-value 0) initial-value)
-    (labels ((parse-declaration (x)
+  (let (name initial-value size
+        (preallocated-value (if (eql 1 (size-of type))
+                                0
+                                (make-array (size-of type)
+                                            :initial-element 0))))
+    (labels ((init-object (value)
+               (if (vector-literal-p value)
+                   (let ((els (cons 'vector (vector-literal-elements value))))
+                     (if (and (consp type) (eq 'vacietis.c:struct (car type)))
+                         els
+                         (progn
+                           (setf size (1- (length els)))
+                           `(vacietis::make-memptr :mem ,els))))
+                   value))
+             (parse-declaration (x)
                (if (symbolp x)
                    (setf name x)
-                   (progn (case (car x)
-                            (vacietis.c:= (setf initial-value (third x)))
-                            (vacietis.c:[]
-                             (awhen (third x)
-                               (setf preallocated-value
-                                     `(vacietis:allocate-memory ,it)))))
-                          (parse-declaration (second x))))))
+                   (destructuring-bind (qualifier name1 &optional val/size) x
+                     (setf name name1)
+                     (case qualifier
+                       (vacietis.c:=
+                        (setf initial-value (init-object val/size))
+                        (parse-declaration name1))
+                       (vacietis.c:[]
+                        (when val/size
+                          (setf size               val/size
+                                preallocated-value `(allocate-memory ,val/size))))
+                       (vacietis.c:deref*
+                        (parse-declaration name))
+                       (t (read-error "Unknown thing in declaration ~A" x)))))))
       (parse-declaration spec)
-      ;; this is totally broken
       (setf (gethash name (or *local-sizes*
                               (compiler-state-var-sizes *compiler-state*)))
-            (cond ((consp preallocated-value)
-                   (second preallocated-value))
-                  ((consp type)
-                   (let ((type-size (size-of type)))
-                     (setf preallocated-value
-                           `(vacietis:allocate-memory ,type-size))
-                     type-size))
-                  (t 1)))
+            (or size (size-of type)))
       (if (boundp '*variable-declarations*)
           (progn (push (list name preallocated-value) *variable-declarations*)
                  (when initial-value `((vacietis.c:= ,name ,initial-value))))
@@ -738,7 +748,7 @@
                (vacietis.c:struct (read-struct type))
                (vacietis.c:enum   (read-enum-decl))))
             (t
-             (read-variable-declaration name (unless pointer? type)))))))
+             (read-variable-declaration name (or pointer? type)))))))
 
 (defun read-labeled-statement (token)
   (when (eql #\: (peek-char t %in))
@@ -798,10 +808,12 @@
                     it)))
              (t (c-unread-char two) one-match)))))
 
-(defun read-array-literal ()
-  (let ((content (map 'list #'parse-infix (c-read-delimited-list #\{ #\,))))
-    `(vacietis::make-memptr
-      :mem (make-array ,(length content) :initial-contents (list ,@content)))))
+(defstruct vector-literal
+  elements)
+
+(defun read-vector-literal ()
+  (make-vector-literal
+   :elements (map 'list #'parse-infix (c-read-delimited-list #\{ #\,))))
 
 (defun read-c-exp (c)
   (or (match-longest-op c)
@@ -829,7 +841,7 @@
                (#\" (read-c-string %in c))
                (#\' (read-character-constant %in c))
                (#\( (read-exps-until (lambda (c) (eql #\) c))))
-               (#\{ (read-array-literal)) ;; decl only
+               (#\{ (read-vector-literal)) ;; decl only
                (#\[ (list 'vacietis.c:[]
                           (read-exps-until (lambda (c) (eql #\] c))))))))))
 

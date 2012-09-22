@@ -34,7 +34,8 @@ foobar;"
   "foobar")
 
 (eval-test h&s-while-string-copy
-  "char source_pointer[] = \"foobar\", dest_pointer[7];
+  "char source_array[] = \"foobar\", dest_array[7];
+  char *source_pointer = source_array, *dest_pointer = dest_array;
 while ( *dest_pointer++ = *source_pointer++ );
 dest_pointer - 7;"
   "foobar")
@@ -353,3 +354,30 @@ bar.x = 7;
 foo = &bar;
 foo->x * (*foo).x;"
   49)
+
+(eval-test pointer-lvalue
+  "int i = 1;
+int *j = &i;
+*j += 1;
+i;"
+  2)
+
+(eval-test pointer-lvalue1
+  "int foo[3];
+int *x = &foo[1];
+
+foo[1] = 3;
+foo[2] = 5;
+
+*x;"
+  3)
+
+(eval-test pointer-lvalue2
+  "int foo[3];
+int *x = &foo[1];
+
+foo[1] = 3;
+foo[2] = 5;
+
+*(x + 1);"
+  5)

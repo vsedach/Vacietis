@@ -161,10 +161,11 @@
    #:system
    #:abs
    #:labs
-   #:bsearch
-   #:qsort
+   #:llabs
    #:div
    #:ldiv
+   #:bsearch
+   #:qsort
    ))
 
 (deflibcpkg #:vacietis.libc.stdio.h

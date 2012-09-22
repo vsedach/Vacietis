@@ -138,12 +138,22 @@
   (declare (ignore command))
   0)
 
-;;; search and sort
-;;; get bsearch and qsort from a reference libc
-
-;;; some math functions
+;;; math functions
 
 (defun/1 labs (x)
   (abs x))
 
-;; need structs for div/ldiv
+(defun/1 llabs (x)
+  (abs x))
+
+(defun/1 div (n d)
+  )
+
+(defun/1 ldiv (n d)
+  (div n d))
+
+(defun/1 lldiv (n d)
+  (div n d))
+
+;;; search and sort
+;;; TODO

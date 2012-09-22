@@ -64,11 +64,14 @@
   closure)
 
 (defmacro vacietis.c:mkptr& (place) ;; need to deal w/function pointers
-  (let ((new-value (gensym)))
-    `(make-place-ptr :closure (lambda (&optional ,new-value)
-                                (if ,new-value
-                                    (setf ,place ,new-value)
-                                    ,place)))))
+  (let ((new-value   (gensym))
+        (place       (macroexpand place)))
+    (if (and (consp place) (eq 'vacietis.c:deref* (elt place 0)))
+        (elt place 1)
+        `(make-place-ptr :closure (lambda (&optional ,new-value)
+                                    (if ,new-value
+                                        (setf ,place ,new-value)
+                                        ,place))))))
 
 (defun vacietis.c:deref* (ptr)
   (etypecase ptr
@@ -80,16 +83,13 @@
     (memptr    (setf (aref (memptr-mem ptr) (memptr-ptr ptr)) new-value))
     (place-ptr (funcall (place-ptr-closure ptr) new-value))))
 
-(defun vacietis.c:[] (a i)
-  (aref (memptr-mem a) (+ (memptr-ptr a) i)))
-
-(defun (setf vacietis.c:[]) (new-value a i)
-  (setf (aref (memptr-mem a) (+ (memptr-ptr a) i)) new-value))
+(defmacro vacietis.c:[] (a i)
+  `(vacietis.c:deref* (vacietis.c:+ ,a ,i)))
 
 (defmacro vacietis.c:|.| (x i)
   (if (and (consp x) (eq 'vacietis.c:|.| (elt x 0)))
       `(vacietis.c:|.| ,(elt x 1) ,(+ (elt x 2) i))
-      `(vacietis.c:deref* (vacietis.c:+ ,x ,i))))
+      `(aref ,x ,i)))
 
 ;;; arithmetic
 
