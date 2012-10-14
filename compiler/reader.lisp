@@ -1,29 +1,26 @@
-(in-package #:vacietis.reader)
+(in-package #:vacietis)
 (in-readtable vacietis)
 
 (declaim (optimize (debug 3)))
 
 (in-package #:vacietis.c)
 
-(cl:defparameter vacietis.reader::*basic-c-types*
-  '(int void short long float double char))
+(cl:defparameter vacietis::*type-qualifiers*
+  #(static const signed unsigned extern auto register))
 
-(cl:defparameter vacietis.reader::*type-qualifiers*
-  '(static const signed unsigned extern auto register))
-
-(cl:defparameter vacietis.reader::*ops*
+(cl:defparameter vacietis::*ops*
   #(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / % ! ~ -> |.| |,|))
 
-(cl:defparameter vacietis.reader::*possible-prefix-ops*
+(cl:defparameter vacietis::*possible-prefix-ops*
   #(! ~ sizeof - + & * ++ --))
 
-(cl:defparameter vacietis.reader::*ambiguous-ops*
+(cl:defparameter vacietis::*ambiguous-ops*
   #(- + & *))
 
-(cl:defparameter vacietis.reader::*assignment-ops*
+(cl:defparameter vacietis::*assignment-ops*
   #(= += -= *= /= %= <<= >>= &= ^= |\|=|))
 
-(cl:defparameter vacietis.reader::*binary-ops-table*
+(cl:defparameter vacietis::*binary-ops-table*
   #((|\|\||)                            ; or
     (&&)                                ; and
     (|\||)                              ; logior
@@ -35,7 +32,7 @@
     (+ -)
     (* / %)))
 
-(cl:in-package #:vacietis.reader)
+(cl:in-package #:vacietis)
 
 (defvar %in)
 (defvar *c-file* nil)
@@ -316,7 +313,7 @@
                              (or *load-truename* *compile-file-truename*
                                  *default-pathname-defaults*)))
                            *compiler-state*)
-             (vacietis::include-libc-file include-file))))
+             (include-libc-file include-file))))
       (vacietis.c:if
        (push 'if preprocessor-if-stack)
        (unless (preprocessor-test (pp-read-line))
@@ -346,23 +343,29 @@
        (pp-read-line))))
   (values))
 
-;;; infix
+;;; types and size-of
+
+(defun type-qualifier? (x)
+  (find x *type-qualifiers*))
+
+(defun basic-type? (x)
+  (find x *basic-c-types*))
+
+(defun c-type? (identifier)
+  ;; and also do checks for struct, union, enum and typedef types
+  (or (type-qualifier? identifier)
+      (basic-type?     identifier)
+      (find identifier #(vacietis.c:struct vacietis.c:enum))
+      (gethash identifier (compiler-state-typedefs *compiler-state*))))
+
+(defvar *local-var-types* nil)
 
 (defun size-of (x)
-  (acond ((or (member x *basic-c-types*) (eq x 'vacietis.c:*))
-          1)
-         ((gethash x (or *local-sizes*
-                         (compiler-state-var-sizes *compiler-state*)))
-          it)
-         ((consp x)
-          (case (elt x 0)
-            (vacietis.c:typedef
-             (size-of (gethash (elt x 1)
-                               (compiler-state-typedefs *compiler-state*))))
-            (vacietis.c:struct
-             (gethash (elt x 1) (compiler-state-structs *compiler-state*)))
-            (t
-             (read-error "Don't know how size of ~A" x))))))
+  (or (type-size x)
+      (type-size (gethash x (or *local-var-types*
+                                (compiler-state-var-types *compiler-state*))))))
+
+;;; infix
 
 (defun parse-infix (exp &optional (start 0) (end (when (vectorp exp) (length exp))))
   (if (vectorp exp)
@@ -491,25 +494,11 @@
                                        (read-c-statement c))))
       (read-error "Expected opening brace '{' but found '~A'" c)))
 
-(defun type-qualifier? (x)
-  (member x *type-qualifiers*))
-
-(defun basic-type? (x)
-  (member x *basic-c-types*))
-
-(defun c-type? (identifier)
-  ;; and also do checks for struct, union, enum and typedef types
-  (or (type-qualifier? identifier)
-      (basic-type?     identifier)
-      (find identifier #(vacietis.c:struct vacietis.c:enum))
-      (gethash identifier (compiler-state-typedefs *compiler-state*))))
-
 (defun next-exp ()
   (read-c-exp (next-char)))
 
 (defvar *variable-declarations*)
 (defvar *cases*)
-(defvar *local-sizes* nil)
 
 (defun read-exps-until (predicate)
   (let ((exps (make-buffer)))
@@ -580,7 +569,7 @@
                   (read-error "No 'while' following a 'do'"))))
           (vacietis.c:for
             `(vacietis.c:for
-                 ,(let* ((*local-sizes*           (make-hash-table))
+                 ,(let* ((*local-var-types*       (make-hash-table))
                          (*variable-declarations* ()) ;; c99, I think?
                          (initializations         (progn
                                                     (next-char)
@@ -593,7 +582,8 @@
                                     (c-read-delimited-list #\( #\;))))
                ,(read-block-or-statement)))))))
 
-(defun read-function (name)
+(defun read-function (name result-type)
+  (declare (ignore result-type))
   (let (arglist)
     (block done-arglist
       (loop for param across (c-read-delimited-list (next-char) #\,) do
@@ -622,67 +612,98 @@
         (prog1 t (c-read-char)) ;; forward declaration
         `(defun/1 ,name ,(reverse arglist)
            ,(let* ((*variable-declarations* ())
-                   (*local-sizes*           (make-hash-table))
+                   (*local-var-types*       (make-hash-table))
                    (body                    (read-c-block (next-char))))
               `(prog* ,*variable-declarations*
                   ,@body))))))
 
-(defun process-variable-declaration (spec type)
-  (let (name initial-value size
-        (preallocated-value (if (eql 1 (size-of type))
-                                0
-                                (make-array (size-of type)
-                                            :initial-element 0))))
+(defun process-variable-declaration (spec base-type)
+  (let (name (type base-type) initial-value init-size)
     (labels ((init-object (value)
                (if (vector-literal-p value)
                    (let ((els (cons 'vector (vector-literal-elements value))))
-                     (if (and (consp type) (eq 'vacietis.c:struct (car type)))
+                     (if (struct-type-p type)
                          els
-                         (progn
-                           (setf size (1- (length els)))
-                           `(vacietis::make-memptr :mem ,els))))
-                   value))
+                         (progn (setf init-size (length els))
+                                `(vacietis::make-memptr :mem ,els))))
+                   (progn
+                     (when (and (listp value) (eq 'string-to-char* (car value)))
+                       (setf init-size (length (second value))))
+                     value)))
              (parse-declaration (x)
                (if (symbolp x)
                    (setf name x)
-                   (destructuring-bind (qualifier name1 &optional val/size) x
+                   (destructuring-bind (qualifier name1 &optional val/size)
+                       x
                      (setf name name1)
                      (case qualifier
                        (vacietis.c:=
                         (setf initial-value (init-object val/size))
                         (parse-declaration name1))
                        (vacietis.c:[]
-                        (when val/size
-                          (setf size               val/size
-                                preallocated-value `(allocate-memory ,val/size))))
+                        (setf type
+                              (make-array-type
+                               :element-type type
+                               :dimensions   (awhen (or val/size init-size)
+                                               (list it)))))
                        (vacietis.c:deref*
+                        (setf type (make-pointer-to :type type))
                         (parse-declaration name))
                        (t (read-error "Unknown thing in declaration ~A" x)))))))
       (parse-declaration spec)
-      (setf (gethash name (or *local-sizes*
-                              (compiler-state-var-sizes *compiler-state*)))
-            (or size (size-of type)))
-      (if (boundp '*variable-declarations*)
-          (progn (push (list name preallocated-value) *variable-declarations*)
-                 (when initial-value `((vacietis.c:= ,name ,initial-value))))
-          `((defparameter ,name ,(or initial-value preallocated-value)))))))
+      (values name type initial-value))))
 
-(defun read-variable-declaration (first-name type)
-  (let* ((decls (c-read-delimited-list #\; #\,))
-         (first (make-array (1+ (length (aref decls 0))))))
-    (replace first (aref decls 0) :start1 1)
-    (setf (aref first 0) first-name
-          (aref decls 0) first)
-    (aif (loop for x across decls appending
-              (process-variable-declaration (parse-infix x) type))
-         (cons 'progn it)
-         t)))
+(defun read-variable-declarations (spec-so-far base-type)
+  (let ((decls      (c-read-delimited-list #\; #\,))
+        (decl-code  ()))
+    (setf (aref decls 0) (concatenate 'vector spec-so-far (aref decls 0)))
+    (loop for x across decls do
+         (multiple-value-bind (name type initial-value)
+             (process-variable-declaration (parse-infix x) base-type)
+           (setf (gethash name (or *local-var-types*
+                                   (compiler-state-var-types *compiler-state*)))
+                 type)
+           (if (boundp '*variable-declarations*)
+               (progn (push (list name (preallocated-value-exp-for type))
+                            *variable-declarations*)
+                      (when initial-value
+                        (push `(vacietis.c:= ,name ,initial-value)
+                              decl-code)))
+               (push `(defparameter ,name
+                        ,(or initial-value
+                             (preallocated-value-exp-for type)))
+                     decl-code))))
+    (if decl-code
+        (cons 'progn (reverse decl-code))
+        t)))
 
-(defun read-typedef (type name)
-  (setf (gethash name (compiler-state-typedefs *compiler-state*)) type)
-  (ecase (c-read-char)
-    (#\, (read-typedef type (next-exp))) ;; is this right?
-    (#\; t)))
+(defun read-var-or-function-declaration (base-type)
+  "Reads a variable(s) or function declaration"
+  (let ((type base-type)
+        name
+        (spec-so-far (make-buffer)))
+    (loop for c = (next-char) do
+         (cond ((eql c #\*)
+                (setf type        (make-pointer-to :type type))
+                (vector-push-extend 'vacietis.c:* spec-so-far))
+               ((or (eql c #\_) (alpha-char-p c))
+                (setf name (read-c-identifier c))
+                (vector-push-extend name spec-so-far)
+                (return))
+               (t
+                (c-unread-char c)
+                (return))))
+    (let ((next (next-char)))
+      (c-unread-char next)
+      (if (and name (eql #\( next))
+          (read-function name type)
+          (read-variable-declarations spec-so-far base-type)))))
+
+(defun read-typedef (base-type)
+  (multiple-value-bind (name type)
+      (process-variable-declaration (read-infix-exp (next-exp)) base-type)
+    (setf (gethash name (compiler-state-typedefs *compiler-state*)) type)
+    t))
 
 (defun read-enum-decl ()
   (when (eql #\{ (peek-char t %in))
@@ -694,61 +715,63 @@
                  i))))
   (if (eql #\; (peek-char t %in))
       (progn (next-char) t)
-      (read-variable-declaration (read-c-exp (next-char)) 'vacietis.c:int)))
+      (read-variable-declarations #() 'vacietis.c:int)))
 
-(defun read-place-description (type)
-  (loop while (type-qualifier? type)
-        do    (setf type (next-exp)))
-  (when (eq type 'vacietis.c:typedef)
-    (setf type (next-exp)))
-  (awhen (gethash type (compiler-state-typedefs *compiler-state*))
-    (setf type it))
-  (cond ((find type #(vacietis.c:struct vacietis.c:enum))
-         (values nil (list type (next-exp)) nil))
-        ((basic-type? type)
-         (let ((name     (next-exp))
-               (pointer? nil))
-           (loop while (eq name 'vacietis.c:*)
-                 do    (setf pointer? name
-                             name     (next-exp)))
-           (values name type pointer?)))))
+(defun read-base-type (token)
+  (loop while (type-qualifier? token)
+        do    (setf token (next-exp)))
+  (when (eq token 'vacietis.c:typedef)
+    (setf token (next-exp)))
+  (awhen (gethash token (compiler-state-typedefs *compiler-state*))
+    (setf token it))
+  (cond ((eq token 'vacietis.c:enum)
+         (make-enum-type :name (next-exp)))
+        ((eq token 'vacietis.c:struct)
+         (let ((name (next-exp)))
+           (or (gethash name (compiler-state-structs *compiler-state*))
+               (make-struct-type :name name))))
+        ((or (basic-type? token) (c-type-p token))
+         token)
+        (t
+         (read-error "Unexpected parser error: unknown type ~A" token))))
 
-(defun read-struct (type)
+(defun read-struct (struct-type)
   (acase (next-char)
     (#\{ (let ((i 0))
            (loop for c = (next-char) until (eql #\} c) do
-                (multiple-value-bind (slot-name slot-type pointer?)
-                    (read-place-description (read-c-exp c))
-                  (setf slot-name (or slot-name (next-exp))
-                        (gethash
-                         slot-name (compiler-state-accessors *compiler-state*)) i
-                         i (+ i (if pointer? 1 (size-of slot-type))))
-                  (unless (eq #\; (next-char))
-                    (read-error "Error in struct declaration"))))
-           (setf (gethash (elt type 1) (compiler-state-structs *compiler-state*))
-                 i))
-         (if (eql #\; (peek-char t %in))
-             (progn (next-char) t)
-             (read-variable-declaration (next-exp) type)))
-    (#\* (slurp-while (lambda (c) (eql c #\*)))
-         (read-variable-declaration (next-exp) type))
+                (multiple-value-bind (slot-name slot-type)
+                    (let ((base-type (read-base-type (read-c-exp c))))
+                      (process-variable-declaration (read-infix-exp (next-exp))
+                                                    base-type))
+                  (setf (gethash slot-name
+                                 (compiler-state-accessors *compiler-state*))
+                        i
+                        (struct-type-slots struct-type)
+                        (append (struct-type-slots struct-type) (list slot-type)))
+                  (incf i (size-of slot-type)))))
+         (setf (gethash (struct-type-name struct-type)
+                        (compiler-state-structs *compiler-state*))
+               struct-type)
+         (let ((c (next-char)))
+           (if (eql #\; c)
+               t
+               (progn (c-unread-char c)
+                      (read-variable-declarations #() struct-type)))))
     (#\; t) ;; forward declaration
-    (t   (read-variable-declaration (read-c-exp it) type))))
+    (t   (read-variable-declarations (vector (read-c-exp it))
+                                     struct-type))))
 
 (defun read-declaration (token)
   (when (or (c-type? token) (eq 'vacietis.c:typedef token))
-    (multiple-value-bind (name type pointer?)
-        (read-place-description token)
-      (cond ((eql #\( (peek-char t %in))
-             (read-function name))
-            ((eq token 'vacietis.c:typedef)
-             (read-typedef type name))
-            ((consp type)
-             (ecase (elt type 0)
-               (vacietis.c:struct (read-struct type))
-               (vacietis.c:enum   (read-enum-decl))))
+    (let ((base-type (read-base-type token)))
+      (cond ((eq token 'vacietis.c:typedef)
+             (read-typedef base-type))
+            ((struct-type-p base-type)
+             (read-struct base-type))
+            ((enum-type-p base-type)
+             (read-enum-decl))
             (t
-             (read-variable-declaration name (or pointer? type)))))))
+             (read-var-or-function-declaration base-type))))))
 
 (defun read-labeled-statement (token)
   (when (eql #\: (peek-char t %in))
@@ -902,5 +925,5 @@
         (*line-number* 1))
     (load *c-file*)))
 
-(defun vacietis:load-c-file (file)
+(defun load-c-file (file)
   (%load-c-file file (make-compiler-state)))

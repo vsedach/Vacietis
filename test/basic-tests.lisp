@@ -351,9 +351,10 @@ x * *y;"
 } *foo, bar;
 
 bar.x = 7;
+bar.y = 11;
 foo = &bar;
-foo->x * (*foo).x;"
-  49)
+foo->x * (*foo).y;"
+  77)
 
 (eval-test pointer-lvalue
   "int i = 1;

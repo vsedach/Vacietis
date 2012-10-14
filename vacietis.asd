@@ -15,6 +15,7 @@
              (:file "state")
              (:file "implementation")
              (:file "libc-support")
+             (:file "type")
              (:file "reader")))
    (:module :libc
             :serial t

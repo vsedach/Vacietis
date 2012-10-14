@@ -36,7 +36,7 @@
             (merge-pathnames
              (format nil "../libc/~a" include-file)
              #.(or *compile-file-truename* *load-truename*)))
-      (vacietis.reader::%load-c-file it *compiler-state*))))
+      (%load-c-file it *compiler-state*))))
 
 (defmacro libc-dir ()
   (directory-namestring (or *load-truename* *compile-file-truename*)))

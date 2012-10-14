@@ -435,12 +435,9 @@ x++;"
   "return;"
   (cl:return 0))
 
-(reader-test array-of-ints0
-  "int foobar[];"
-  (cl:progn (cl:defparameter foobar 0)))
 
-(reader-test array-of-pointers-to-int0
-  "int *foobar[];"
+(reader-test pointer-to-array-of-ints
+  "int (*foobar)[];" ;; ok not to specify size of array here
   (cl:progn (cl:defparameter foobar 0)))
 
 (reader-test array-of-pointers-to-int1
@@ -523,29 +520,38 @@ x++;"
   (cl:progn (cl:defparameter x (bar (+ 3 4)))
             (cl:defparameter y (foo (+ 1 2)))))
 
-(reader-test declare-deref0
-  "int *x[], *y[] = foo;"
-  (cl:progn (cl:defparameter x 0) (cl:defparameter y foo)))
+(reader-test declare-array-of-pointers
+  "int *x[10];"
+  (cl:progn (cl:defparameter x (vacietis:allocate-memory 10))))
+
+(reader-test declare-pointer-to-array
+  "int (*x)[10];" ;; pointer to array of 10 integers
+  (cl:progn (cl:defparameter x 0)))
 
 (reader-test declare-deref1
-  "int *x[], *y[] = 4;"
-  (cl:progn (cl:defparameter x 0) (cl:defparameter y 4)))
+  "int *x[4], *y[] = { 7, 11 };"
+  (cl:progn (cl:defparameter x (vacietis:allocate-memory 4))
+            (cl:defparameter y (vacietis::make-memptr :mem (cl:vector 7 11)))))
 
 (reader-test declare-deref2
-  "int *x[], *y = 4;"
-  (cl:progn (cl:defparameter x 0) (cl:defparameter y 4)))
+  "int *x[2], *y = 4;"
+  (cl:progn (cl:defparameter x (vacietis:allocate-memory 2))
+            (cl:defparameter y 4)))
 
 (reader-test declare-deref3
-  "int *x[], *y;"
-  (cl:progn (cl:defparameter x 0) (cl:defparameter y 0)))
+  "int *x[2], *y;"
+  (cl:progn (cl:defparameter x (vacietis:allocate-memory 2))
+            (cl:defparameter y 0)))
 
 (reader-test declare-deref4
-  "int *x[], y;"
-  (cl:progn (cl:defparameter x 0) (cl:defparameter y 0)))
+  "int *x[2], y;"
+  (cl:progn (cl:defparameter x (vacietis:allocate-memory 2))
+            (cl:defparameter y 0)))
 
 (reader-test declare-deref5
-  "int x[], y;"
-  (cl:progn (cl:defparameter x 0) (cl:defparameter y 0)))
+  "int x[1234], y;"
+  (cl:progn (cl:defparameter x (vacietis:allocate-memory 1234))
+            (cl:defparameter y 0)))
 
 (reader-test declare-two-chars-initialize0
   "char source_pointer[] = \"foobar\", dest_pointer[7];"

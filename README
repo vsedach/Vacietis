@@ -112,9 +112,9 @@ compiler and libc.
 
 * TODO:
   ----
-- pointer arithmetic on pointers to structs and arrays
+- pointer scaling
 - enums: assignment of arbitrary values to enum labels
-- struct and array call by value
+- struct call by value
 - pass arguments to main()
 - implement overloading class scope correctly (see H&S p. 147)
 - libc stdio: binary streams

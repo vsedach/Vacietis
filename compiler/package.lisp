@@ -23,15 +23,7 @@
    #:make-compiler-state
    #:load-c-file
    #:run-c-program
-   )
-  (:intern
-   #:defun/1
-   #:compiler-state-pp
-   #:compiler-state-typedefs
-   #:compiler-state-structs
-   #:compiler-state-accessors
-   #:compiler-state-enums
-   #:compiler-state-var-sizes))
+   ))
 
 (in-package #:vacietis)
 
@@ -41,17 +33,6 @@
     (:case :invert)))
 
 (in-readtable vacietis)
-
-(defpackage #:vacietis.reader
-  (:use #:cl #:named-readtables #:vacietis #:anaphora)
-  (:import-from #:vacietis
-    #:defun/1
-    #:compiler-state-pp
-    #:compiler-state-typedefs
-    #:compiler-state-structs
-    #:compiler-state-accessors
-    #:compiler-state-enums
-    #:compiler-state-var-sizes))
 
 (defpackage #:vacietis.c
   (:use)

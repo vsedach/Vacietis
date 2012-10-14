@@ -18,7 +18,7 @@
 (defmacro reader-test (name input &rest s-exps)
   `(test ,name
      (is (equalp '(progn ,@s-exps)
-                 (vacietis.reader::cstr ,input)))))
+                 (vacietis::cstr ,input)))))
 
 (defun do-with-temp-c-package (name thunk)
   (let ((test-package (make-package
@@ -36,7 +36,7 @@
                       result)
                  (do-with-temp-c-package ',name
                    (lambda ()
-                     (eval (vacietis.reader::cstr ,input))))))))
+                     (eval (vacietis::cstr ,input))))))))
 
 (defmacro program-test (name &key return-code input output)
   `(test ,name
