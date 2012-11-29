@@ -645,7 +645,8 @@
                               (make-array-type
                                :element-type type
                                :dimensions   (awhen (or val/size init-size)
-                                               (list it)))))
+                                               (list it))))
+                        (parse-declaration name))
                        (vacietis.c:deref*
                         (setf type (make-pointer-to :type type))
                         (parse-declaration name))
