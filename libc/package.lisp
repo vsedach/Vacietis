@@ -169,6 +169,8 @@
    ))
 
 (deflibcpkg #:vacietis.libc.stdio.h
+  (:use #:vacietis.libc.stdarg.h #:vacietis.libc.stdio.h
+        #:vacietis.libc.stdlib.h #:vacietis.libc.ctype.h)
   (:shadow #:remove)
   (:import-from #:vacietis.libc.string.h #:strerror)
   (:shadowing-import-from #:vacietis.libc.stdlib.h #:abort)
