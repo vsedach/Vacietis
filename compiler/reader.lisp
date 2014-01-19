@@ -706,14 +706,31 @@
     (setf (gethash name (compiler-state-typedefs *compiler-state*)) type)
     t))
 
+(defmacro incf-enum (enum)
+  `(etypecase ,enum
+     (number (incf ,enum))
+	 (list (incf (cadr ,enum)))))
+
+(defun copy-if-list (value)
+  (etypecase value
+    (list (copy-list value))
+    (t value)))
+
+;; negative numbers will have a list value (- <number>) after being infix parsed
 (defun read-enum-decl ()
   (when (eql #\{ (peek-char t %in))
     (next-char)
-    (let ((enums (c-read-delimited-list #\{ #\,)))
-      ;; fixme: assigned values to enum names
+    (let ((enums (c-read-delimited-list #\{ #\,))
+          (enum-value 0))
       (loop for name across enums for i from 0 do
-           (setf (gethash (elt name 0) (compiler-state-enums *compiler-state*))
-                 i))))
+        (let ((name (elt enums i)))
+          (ecase (length name)
+            (1 (setf (gethash (elt name 0) (compiler-state-enums *compiler-state*)) (copy-if-list enum-value)))
+            ((3 4)  ;; equals token and possibly negation token
+             (let ((name (parse-infix name)))
+               (setf enum-value (elt name 2)
+                     (gethash (elt name 1) (compiler-state-enums *compiler-state*)) (copy-if-list enum-value))))))
+        (incf-enum enum-value))))
   (if (eql #\; (peek-char t %in))
       (progn (next-char) t)
       (read-variable-declarations #() 'vacietis.c:int)))

@@ -291,6 +291,32 @@ if (x == bar) A = 3;
 A;"
   3)
 
+(eval-test enums2
+  "enum foo { bar, baz } x = bar, y = baz;
+int A = 0;
+
+if (x == 0 && y == 1) A = 3;
+A;"
+  3)
+
+(eval-test enum3
+  "enum foo { bar = 20, baz, cork, dez = -15, efd = - 14, gee }
+     d = bar, e = baz, f = cork, g = dez, h = efd, i = gee;
+int A = 0;
+
+if (20 == d && 21 == e && 22 == f && -15 == g && -14 == h && -15 == i) A = 3;
+A;"
+  3)
+
+;; where first value is implicit and then we do explicit
+(eval-test enum4
+  "enum foo { bar, baz = -20} a = bar, b = baz;
+int A = 0;
+
+if (0 == bar && -20 == baz) A = 3;
+A;"
+  3)
+
 (eval-test struct1
   "struct point {
   int x;
