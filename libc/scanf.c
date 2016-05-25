@@ -178,7 +178,7 @@ _scnf (int (*getfn)(), int (*ungetfn)(), FILE *stream, char *fmt, va_list pointe
         }
         break;
       case 'c':
-        if (fieldwidth = DEFAULT_FIELD_WIDTH) fieldwidth = 1;
+        if (fieldwidth == DEFAULT_FIELD_WIDTH) fieldwidth = 1;
         cp = (char *)va_arg(pointers, (char *));
         while (fieldwidth-- > 0  &&  ic != EOF) {
           if (!noassign) *cp++ = ic;
