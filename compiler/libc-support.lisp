@@ -39,7 +39,7 @@
       (%load-c-file it *compiler-state*))))
 
 (defmacro libc-dir ()
-  (directory-namestring (or *load-truename* *compile-file-truename*)))
+  (directory-namestring (or *compile-file-truename* *load-truename*)))
 
 (defmacro load-libc-file (file libc-dir)
   `(eval-when (:compile-toplevel :load-toplevel)
