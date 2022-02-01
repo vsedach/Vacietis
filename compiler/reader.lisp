@@ -278,6 +278,14 @@
                         (vector-push-extend last acc)))))
     (map 'list #'identity acc)))
 
+(defun find-include (include-file)
+  (dolist (path (compiler-state-include-paths *compiler-state*))
+    (let ((include (merge-pathnames
+                    (merge-pathnames include-file path)
+                    (or *load-truename* *compile-file-truename*
+                        *default-pathname-defaults*))))
+      (when (cl-fad:file-exists-p include) (return include)))))
+
 (defun read-c-macro (%in sharp)
   (declare (ignore sharp))
   ;; preprocessor directives need to be read in a separate namespace
@@ -313,7 +321,10 @@
                              (or *load-truename* *compile-file-truename*
                                  *default-pathname-defaults*)))
                            *compiler-state*)
-             (include-libc-file include-file))))
+             (let ((non-system-include-file (find-include include-file)))
+               (if non-system-include-file
+                   (%load-c-file non-system-include-file *compiler-state*)
+                   (include-libc-file include-file))))))
       (vacietis.c:if
        (push 'if preprocessor-if-stack)
        (unless (preprocessor-test (pp-read-line))
@@ -931,5 +942,5 @@
         (*line-number* 1))
     (load *c-file*)))
 
-(defun load-c-file (file)
-  (%load-c-file file (make-compiler-state)))
+(defun load-c-file (file &key include-paths)
+  (%load-c-file file (make-compiler-state :include-paths include-paths)))

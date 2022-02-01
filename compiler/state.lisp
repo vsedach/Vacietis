@@ -9,4 +9,5 @@
   (structs   (make-hash-table))
   (accessors (make-hash-table))
   (enums     (make-hash-table))
-  (var-types (make-hash-table)))
+  (var-types (make-hash-table))
+  (include-paths '()))
