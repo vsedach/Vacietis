@@ -6,7 +6,7 @@
 (in-package #:vacietis.c)
 
 (cl:defparameter vacietis::*type-qualifiers*
-  #(static const signed unsigned extern auto register))
+  #(static const signed unsigned extern auto register volatile))
 
 (cl:defparameter vacietis::*ops*
   #(= += -= *= /= %= <<= >>= &= ^= |\|=| ? |:| |\|\|| && |\|| ^ & == != < > <= >= << >> ++ -- + - * / % ! ~ -> |.| |,|))
