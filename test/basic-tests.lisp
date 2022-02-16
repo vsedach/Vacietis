@@ -199,7 +199,7 @@ BAR;"
   1)
 
 (eval-test define-define1
-  "#define fo0 (x, y) x >> y
+  "#define fo0(x, y) x >> y
 #define Bar fo0
 Bar(0xFFF, 2);"
   1023)
