@@ -293,7 +293,7 @@
     (case pp-directive
       (vacietis.c:define
        (setf (lookup-define)
-             (if (eql #\( (peek-char t %in))
+             (if (eql #\( (peek-char nil %in))
                  (let ((args     (c-read-delimited-strings t))
                        (template (string-trim '(#\Space #\Tab) (pp-read-line))))
                    (lambda (substitutions)
