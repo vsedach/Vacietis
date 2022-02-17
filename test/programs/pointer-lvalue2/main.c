@@ -7,7 +7,5 @@ int main() {
   foo[1] = 3;
   foo[2] = 5;
 
-  int y = foo[1];
-
   printf("%d\n", *(x + 1));
 }
