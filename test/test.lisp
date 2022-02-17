@@ -46,12 +46,12 @@
           (merge-pathnames
            (format nil "programs/~(~A~)/main.c" ',name)
            (directory-namestring #.(or *compile-file-truename* *load-truename*))))
-         (let* ((test-output-stream (when ,output
-                                      (make-string-output-stream)))
+         (let* ((test-output-stream ,(when output
+                                      `(make-string-output-stream)))
                 (result (run-c-program
                          *package*
-                         :stdin (when ,input
-                                  (make-string-input-stream ,input))
+                         :stdin ,(when input
+                                  `(make-string-input-stream ,input))
                          :stdout test-output-stream)))
            (declare (ignorable result))
            (when ,return-code
