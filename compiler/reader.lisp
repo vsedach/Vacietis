@@ -226,6 +226,8 @@
     (loop for line = (pp-read-line) do
          (cond ((starts-with? line "#if")
                 (incf if-nest-depth))
+               ((starts-with? line "#else")
+                (return))
                ((and (starts-with? line "#endif")
                      (= 0 (decf if-nest-depth)))
                 (pop preprocessor-if-stack)
