@@ -815,3 +815,12 @@ int preprocessor_defined_complex_wrapped = 1;
 int preprocessor_defined_complex_wrapped = 2;
 #endif"
   (cl:progn (cl:defparameter preprocessor_defined_complex_wrapped 1)))
+
+;; Support using undefined macros as values.
+(reader-test preprocessor-use-undefined-macro
+  "#if PREPROCESSOR_USE_UNDEFINED_MACRO
+int preprocessor_use_undefined_macro = 1;
+#else
+int preprocessor_use_undefined_macro = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_use_undefined_macro 2)))
