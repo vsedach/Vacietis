@@ -84,7 +84,7 @@
              ((nil)                     (when eof-error?
                                           (read-error "Unexpected end of file")))
              (#\/                       (%maybe-read-comment))
-             ((#\Space #\Newline #\Tab) t))
+             ((#\Space #\Newline #\Tab #\\) t))
      finally (return c)))
 
 (defun make-buffer (&optional (element-type t))
