@@ -714,3 +714,14 @@ getchar();"
 
 ;; (reader-test unclosed-string
 ;;   "\"foo")
+
+;; Handle empty defines.
+(reader-test preprocessor-define-only
+  "#define PREPROCESSOR_DEFINE_ONLY
+#ifdef PREPROCESSOR_DEFINE_ONLY
+int preprocessor_define_only = 1;
+#endif
+#ifndef PREPROCESSOR_DEFINE_ONLY
+int preprocessor_define_only = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_define_only 1)))
