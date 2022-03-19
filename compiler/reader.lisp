@@ -879,7 +879,9 @@
                  ((gethash symbol (compiler-state-enums *compiler-state*))
                   it)
                  (t
-                  symbol))))
+                  (if (string-equal symbol "defined")
+                      (or (lookup-define) 0)
+                      symbol)))))
             (t
              (case c
                (#\" (read-c-string %in c))
