@@ -731,3 +731,9 @@ int preprocessor_define_only = 2;
   "int \\
 ignore_line_continuation_character = 3;"
   (cl:progn (cl:defparameter ignore_line_continuation_character 3)))
+
+;; Fix parsing of decimal 0
+(reader-test parse-decimal-zero
+  "#if 0
+int preprocessor_else = 1;
+#endif")
