@@ -764,3 +764,42 @@ int preprocessor_not = 1;
 int preprocessor_not = 2;
 #endif"
   (cl:progn (cl:defparameter preprocessor_not 1)))
+
+;; Handle defined operator, test 1.
+(reader-test preprocessor-defined-false
+  "#if defined PREPROCESSOR_DEFINED_FALSE
+int preprocessor_defined_false = 1;
+#else
+int preprocessor_defined_false = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_defined_false 2)))
+
+;; Handle defined operator, test 2.
+(reader-test preprocessor-not-defined
+  "#if ! defined PREPROCESSOR_NOT_DEFINED
+int preprocessor_not_defined = 1;
+#else
+int preprocessor_not_defined = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_not_defined 1)))
+
+;; Handle defined operator, test 3.
+(reader-test preprocessor-defined-true
+  "#define PREPROCESSOR_DEFINED_TRUE
+#if defined PREPROCESSOR_DEFINED_TRUE
+int preprocessor_defined_true = 1;
+#else
+int preprocessor_defined_true = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_defined_true 1)))
+
+;; Handle defined operator, test 4.
+(reader-test preprocessor-defined-complex
+  "#define SOMETHING 0
+#define PREPROCESSOR_DEFINED_COMPLEX
+#if (defined PREPROCESSOR_DEFINED_COMPLEX && ! defined NOT_DEFINED && SOMETHING)
+int preprocessor_defined_complex = 1;
+#else
+int preprocessor_defined_complex = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_defined_complex 2)))
