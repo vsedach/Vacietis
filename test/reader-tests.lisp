@@ -725,3 +725,9 @@ int preprocessor_define_only = 1;
 int preprocessor_define_only = 2;
 #endif"
   (cl:progn (cl:defparameter preprocessor_define_only 1)))
+
+;; Treat line continuation backslash as whitespace.
+(reader-test ignore-line-continuation-character
+  "int \\
+ignore_line_continuation_character = 3;"
+  (cl:progn (cl:defparameter ignore_line_continuation_character 3)))
