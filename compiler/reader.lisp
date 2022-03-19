@@ -200,6 +200,7 @@
 ;;; preprocessor
 
 (defvar preprocessor-if-stack ())
+(defvar *preprocessing* nil)
 
 (defun pp-read-line ()
   (let (comment-follows?)
@@ -248,15 +249,16 @@
                   (else (read-error "Misplaced #elif"))))))))
 
 (defun preprocessor-test (line)
-  (let ((exp (with-input-from-string (%in line)
-               (read-infix-exp (read-c-exp (next-char))))))
-    (not (eql 0 (eval `(symbol-macrolet
-                           ,(let ((x))
-                                 (maphash (lambda (k v)
-                                            (push (list k v) x))
-                                          (compiler-state-pp *compiler-state*))
-                                 x)
-                         ,exp))))))
+  (let ((*preprocessing* t))
+    (let ((exp (with-input-from-string (%in line)
+                 (read-infix-exp (read-c-exp (next-char))))))
+      (not (eql 0 (eval `(symbol-macrolet
+                             ,(let ((x))
+                                (maphash (lambda (k v)
+                                           (push (list k v) x))
+                                         (compiler-state-pp *compiler-state*))
+                                x)
+                           ,exp)))))))
 
 (defun fill-in-template (args template subs)
   (ppcre:regex-replace-all
@@ -885,8 +887,13 @@
                  ((gethash symbol (compiler-state-enums *compiler-state*))
                   it)
                  (t
-                  (if (string-equal symbol "defined")
-                      (or (lookup-define) 0)
+                  (if *preprocessing*
+                      (if (string-equal symbol "defined")
+                          (or (lookup-define) 0)
+                          (if (gethash symbol
+                                       (compiler-state-pp *compiler-state*))
+                              symbol
+                              0))
                       symbol)))))
             (t
              (case c
