@@ -803,3 +803,15 @@ int preprocessor_defined_complex = 1;
 int preprocessor_defined_complex = 2;
 #endif"
   (cl:progn (cl:defparameter preprocessor_defined_complex 2)))
+
+;; Handle line continuation in preprocessor.
+(reader-test preprocessor-defined-complex-wrapped
+  "#define SOMETHING 3
+#define PREPROCESSOR_DEFINED_COMPLEX_WRAPPED
+#if (defined PREPROCESSOR_DEFINED_COMPLEX_WRAPPED \\
+     && ! defined NOT_DEFINED && SOMETHING)
+int preprocessor_defined_complex_wrapped = 1;
+#else
+int preprocessor_defined_complex_wrapped = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_defined_complex_wrapped 1)))
