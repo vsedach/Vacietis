@@ -94,7 +94,8 @@
   (let ((string-buffer (make-buffer 'character)))
     (loop-reading
        while (and c (funcall predicate c))
-       do (vector-push-extend c string-buffer)
+       do (unless (or (char= c #\\) (char= c #\Newline))
+            (vector-push-extend c string-buffer))
        finally (when c (c-unread-char c)))
     string-buffer))
 
@@ -203,13 +204,18 @@
 (defun pp-read-line ()
   (let (comment-follows?)
    (prog1
-       (slurp-while (lambda (c)
-                      (case c
-                        (#\Newline)
-                        (#\/ (if (find (peek-char nil %in nil nil) "/*")
-                                 (progn (setf comment-follows? t) nil)
-                                 t))
-                        (t t))))
+       (slurp-while (let (backslash-seen)
+                      (lambda (c)
+                        (case c
+                          (#\Newline
+                           (when backslash-seen
+                             (setf backslash-seen nil)
+                             t))
+                          (#\\ (setf backslash-seen t))
+                          (#\/ (if (find (peek-char nil %in nil nil) "/*")
+                                   (progn (setf comment-follows? t) nil)
+                                   t))
+                          (t t)))))
      (c-read-char)
      (when comment-follows?
        (%maybe-read-comment)))))
