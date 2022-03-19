@@ -737,3 +737,30 @@ ignore_line_continuation_character = 3;"
   "#if 0
 int preprocessor_else = 1;
 #endif")
+
+;; Handle #else, test 1.
+(reader-test preprocessor-else
+  "#if 0
+int preprocessor_else = 1;
+#else
+int preprocessor_else = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_else 2)))
+
+;; Handle #else, test 2.
+(reader-test preprocessor-parentheses
+  "#if (0 && 1)
+int preprocessor_parentheses = 1;
+#else
+int preprocessor_parentheses = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_parentheses 2)))
+
+;; Handle #else, test 3.
+(reader-test preprocessor-not
+  "#if (!0 && 1)
+int preprocessor_not = 1;
+#else
+int preprocessor_not = 2;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_not 1)))
