@@ -831,3 +831,26 @@ int preprocessor_use_undefined_macro = 2;
 #define MACRO_WITH_ONE_ARGUMENT(argument) argument
 int preprocessor_macro_with_one_argument = MACRO_WITH_ONE_ARGUMENT(test);"
   (cl:progn (cl:defparameter preprocessor_macro_with_one_argument 3)))
+
+;; Macro with no concatenation.
+;; Note: gcc produces a failure for this fragment:
+;; error: ‘__argument’ undeclared here (not in a function)
+(reader-test preprocessor-no-concatenation
+  "#define __test 3
+#define MACRO_NO_CONCATENATION(argument) __argument
+int preprocessor_macro_no_concatenation = MACRO_NO_CONCATENATION(test);"
+  (cl:progn (cl:defparameter preprocessor_macro_no_concatenation 3)))
+
+;; Macro with concatenation.
+(reader-test preprocessor-macro-with-concatenation
+  "#define __test 3
+#define MACRO_WITH_CONCATENATION(argument) __##argument
+int preprocessor_macro_with_concatenation = MACRO_WITH_CONCATENATION(test);"
+  (cl:progn (cl:defparameter preprocessor_macro_with_concatenation 3)))
+
+;; Macro with double concatenation.
+(reader-test preprocessor-double-concatenation
+  "#define __test__ 4
+#define DOUBLE_CONCATENATION(argument) __##argument##__
+int preprocessor_double_concatenation = DOUBLE_CONCATENATION(test);"
+  (cl:progn (cl:defparameter preprocessor_double_concatenation 4)))

@@ -263,7 +263,9 @@
 (defun fill-in-template (args template subs)
   (ppcre:regex-replace-all
    (format nil "([^a-zA-Z])?(~{~a~^|~})([^a-zA-Z0-9])?" args)
-   template
+   ;; This works, but is more permissive than GCC.  See reader-test
+   ;; preprocessor-no-concatenation.
+   (ppcre:regex-replace-all "##" template "")
    (lambda (match r1 arg r2)
      (declare (ignore match))
      (format nil "~A~A~A"
