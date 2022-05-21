@@ -824,3 +824,10 @@ int preprocessor_use_undefined_macro = 1;
 int preprocessor_use_undefined_macro = 2;
 #endif"
   (cl:progn (cl:defparameter preprocessor_use_undefined_macro 2)))
+
+;; Macro with one argument.
+(reader-test preprocessor-macro-with-one-argument
+  "#define test 3
+#define MACRO_WITH_ONE_ARGUMENT(argument) argument
+int preprocessor_macro_with_one_argument = MACRO_WITH_ONE_ARGUMENT(test);"
+  (cl:progn (cl:defparameter preprocessor_macro_with_one_argument 3)))
