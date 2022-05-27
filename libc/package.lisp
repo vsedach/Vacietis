@@ -123,6 +123,8 @@
    #:memchr
    #:memcmp))
 
+(deflibcpkg #:vacietis.libc.stdbool.h)
+
 (deflibcpkg #:vacietis.libc.stdarg.h
   (:export
    #:va_list

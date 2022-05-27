@@ -4,7 +4,7 @@
 (in-package #:vacietis.c)
 
 (cl:defparameter vacietis::*basic-c-types*
-  #(int void short long float double char))
+  #(int void short long float double char _Bool))
 
 (cl:in-package #:vacietis)
 

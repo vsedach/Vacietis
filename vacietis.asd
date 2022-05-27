@@ -25,6 +25,7 @@
              (:file "stddef")
              (:file "stdarg")
              (:static-file "stdarg.h")
+             (:static-file "stdbool.h")
              (:file "ctype")
              (:file "math")
              (:file "stdio")
