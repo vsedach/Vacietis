@@ -886,3 +886,28 @@ int preprocessor_long = PREPROCESSOR_LONG;"
   "# define PREPROCESSOR_LONG 33l
 int preprocessor_long = PREPROCESSOR_LONG;"
   (cl:progn (cl:defparameter preprocessor_long 33)))
+
+(reader-test preprocessor-nested
+  "#define PREPROCESSOR_NESTED_DEFINED
+#if 0
+# if 0
+   int preprocessor_nested = 1;
+# else
+#  ifdef PREPROCESSOR_NESTED_DEFINED
+    int preprocessor_nested = 4;
+#  else
+    int preprocessor_nested = 3;
+#  endif
+# endif
+#else
+# ifndef PREPROCESSOR_NESTED_NOT_DEFINED
+#  if 0
+    int preprocessor_nested = 2;
+#  else
+    int preprocessor_nested = 9;
+#  endif
+# else
+   int preprocessor_nested = 8;
+# endif
+#endif"
+  (cl:progn (cl:defparameter preprocessor_nested 9)))

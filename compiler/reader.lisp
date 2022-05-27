@@ -232,7 +232,12 @@
     (loop for line = (pp-read-line) do
          (cond ((ppcre:scan "# *if" line)
                 (incf if-nest-depth))
-               ((ppcre:scan "# *else" line)
+               ((ppcre:scan "# *ifdef" line)
+                (incf if-nest-depth))
+               ((ppcre:scan "# *ifndef" line)
+                (incf if-nest-depth))
+               ((and (ppcre:scan "# *else" line)
+                     (= 1 if-nest-depth))
                 (return))
                ((and (ppcre:scan "# *endif" line)
                      (= 0 (decf if-nest-depth)))
