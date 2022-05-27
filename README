@@ -105,6 +105,7 @@ vsedach@gmail.com
 
 (ql:quickload "vacietis.test")
 (vacietis.test:run-tests)
+(eos:run! 'vacietis.test.reader::preprocessor-nested) ; individual test case
 
 The Vacietis test suite includes a variety of code that tests the
 compiler and libc.
