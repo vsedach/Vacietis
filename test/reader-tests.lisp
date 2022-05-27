@@ -864,3 +864,15 @@ int preprocessor_double_concatenation = DOUBLE_CONCATENATION(test);"
 #endif
 int preprocessor_elif = _GL_ATTRIBUTE_DEPRECATED;"
   (cl:progn (cl:defparameter preprocessor_elif 5)))
+
+;; Preprocessor indentation after #.
+(reader-test preprocessor-indentation
+  "# if 0
+# define _GL_ATTRIBUTE_DEPRECATED 3
+# elif 0
+# define _GL_ATTRIBUTE_DEPRECATED 5
+# else
+# define _GL_ATTRIBUTE_DEPRECATED 8
+# endif
+int preprocessor_indentation = _GL_ATTRIBUTE_DEPRECATED;"
+  (cl:progn (cl:defparameter preprocessor_indentation 8)))

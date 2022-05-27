@@ -225,21 +225,18 @@
   `(gethash (read-c-identifier (next-char))
             (compiler-state-pp *compiler-state*)))
 
-(defun starts-with? (str x)
-  (string= str x :end1 (min (length str) (length x))))
-
 (defun preprocessor-skip-branch ()
   (let ((if-nest-depth 1))
     (loop for line = (pp-read-line) do
-         (cond ((starts-with? line "#if")
+         (cond ((ppcre:scan "# *if" line)
                 (incf if-nest-depth))
-               ((starts-with? line "#else")
+               ((ppcre:scan "# *else" line)
                 (return))
-               ((and (starts-with? line "#endif")
+               ((and (ppcre:scan "# *endif" line)
                      (= 0 (decf if-nest-depth)))
                 (pop preprocessor-if-stack)
                 (return))
-               ((and (starts-with? line "#elif")
+               ((and (ppcre:scan "# *elif" line)
                      (= 1 if-nest-depth))
                 (case (car preprocessor-if-stack)
                   (  if (when (preprocessor-test
