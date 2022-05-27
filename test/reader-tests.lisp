@@ -911,3 +911,12 @@ int preprocessor_long = PREPROCESSOR_LONG;"
 # endif
 #endif"
   (cl:progn (cl:defparameter preprocessor_nested 9)))
+
+(reader-test preprocessor-defined-value
+  "#define PREPROCESSOR_DEFINED_VALUE 1
+#if defined PREPROCESSOR_DEFINED_VALUE || defined PREPROCESSOR_UNDEFINED_VALUE
+int preprocessor_defined_value = 3;
+#else
+int preprocessor_defined_value = 4;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_defined_value 3)))

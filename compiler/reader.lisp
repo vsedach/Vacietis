@@ -898,7 +898,7 @@
                  (t
                   (if *preprocessing*
                       (if (string-equal symbol "defined")
-                          (or (lookup-define) 0)
+                          (if (lookup-define) 1 0)
                           (if (gethash symbol
                                        (compiler-state-pp *compiler-state*))
                               symbol
