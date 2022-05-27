@@ -854,3 +854,13 @@ int preprocessor_macro_with_concatenation = MACRO_WITH_CONCATENATION(test);"
 #define DOUBLE_CONCATENATION(argument) __##argument##__
 int preprocessor_double_concatenation = DOUBLE_CONCATENATION(test);"
   (cl:progn (cl:defparameter preprocessor_double_concatenation 4)))
+
+;; Preprocessor #elif.
+(reader-test preprocessor-elif
+  "#if 0
+# define _GL_ATTRIBUTE_DEPRECATED 3
+#elif 3
+# define _GL_ATTRIBUTE_DEPRECATED 5
+#endif
+int preprocessor_elif = _GL_ATTRIBUTE_DEPRECATED;"
+  (cl:progn (cl:defparameter preprocessor_elif 5)))

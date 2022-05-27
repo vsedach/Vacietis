@@ -242,7 +242,10 @@
                ((and (starts-with? line "#elif")
                      (= 1 if-nest-depth))
                 (case (car preprocessor-if-stack)
-                  (if (when (preprocessor-test (pp-read-line))
+                  (  if (when (preprocessor-test
+                               (subseq line (multiple-value-bind (_ end)
+                                                (ppcre:scan "# *elif" line)
+                                              (declare (ignore _)) end)))
                         (setf (car preprocessor-if-stack) 'elif)
                         (return)))
                   (elif nil)
