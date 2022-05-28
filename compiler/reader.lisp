@@ -143,6 +143,8 @@
                   (setf value (+ (* 10 value) (digit-value c))))
                  ((or (char-equal c #\E) (char= c #\.))
                   (return (read-float value c)))
+                 ((char-equal c #\L)
+                  (return value))
                  (t
                   (c-unread-char c)
                   (return value)))))))

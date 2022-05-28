@@ -876,3 +876,13 @@ int preprocessor_elif = _GL_ATTRIBUTE_DEPRECATED;"
 # endif
 int preprocessor_indentation = _GL_ATTRIBUTE_DEPRECATED;"
   (cl:progn (cl:defparameter preprocessor_indentation 8)))
+
+(reader-test preprocessor-long
+  "# define PREPROCESSOR_LONG 33L
+int preprocessor_long = PREPROCESSOR_LONG;"
+  (cl:progn (cl:defparameter preprocessor_long 33)))
+
+(reader-test preprocessor-long-lowercase
+  "# define PREPROCESSOR_LONG 33l
+int preprocessor_long = PREPROCESSOR_LONG;"
+  (cl:progn (cl:defparameter preprocessor_long 33)))
