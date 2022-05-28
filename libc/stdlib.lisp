@@ -128,6 +128,8 @@
 (defun/1 atexit (f)
   (push f *exit-functions*))
 
+(defvar vacietis::*environment* nil)
+
 (defun/1 getenv (name)
   (gethash name vacietis::*environment* NULL))
 
