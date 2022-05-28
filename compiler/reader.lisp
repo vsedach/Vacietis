@@ -918,6 +918,10 @@
                      collect (read-c-statement (next-char))))
         (or exp1 (values)))))
 
+(defun read-c-newline (%in c)
+  (when *line-number* (incf *line-number*))
+  (values))
+
 (macrolet
     ((def-c-readtable ()
        `(defreadtable c-readtable
@@ -926,6 +930,8 @@
          ;; unary and prefix operators
          ,@(loop for i in '(#\+ #\- #\~ #\! #\( #\& #\*)
               collect `(:macro-char ,i 'read-c-toplevel nil))
+
+         (:macro-char #\Newline 'read-c-newline nil)
 
          (:macro-char #\# 'read-c-macro nil)
 
