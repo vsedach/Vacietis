@@ -920,3 +920,7 @@ int preprocessor_defined_value = 3;
 int preprocessor_defined_value = 4;
 #endif"
   (cl:progn (cl:defparameter preprocessor_defined_value 3)))
+
+(reader-test preprocessor-use-empty-define
+  "#define PREPROCESSOR_USE_EMPTY_DEFINE
+PREPROCESSOR_USE_EMPTY_DEFINE")
