@@ -921,6 +921,22 @@ int preprocessor_defined_value = 4;
 #endif"
   (cl:progn (cl:defparameter preprocessor_defined_value 3)))
 
+(reader-test preprocessor-empty-define-only
+  "#define PREPROCESSOR_EMPTY_DEFINE_ONLY
+")
+
 (reader-test preprocessor-use-empty-define
   "#define PREPROCESSOR_USE_EMPTY_DEFINE
-PREPROCESSOR_USE_EMPTY_DEFINE")
+PREPROCESSOR_USE_EMPTY_DEFINE
+")
+
+(reader-test preprocessor-use-empty-define-own-line
+  "#define PREPROCESSOR_USE_EMPTY_DEFINE_OWN_LINE
+int use_empty_define_own_line_1 = 8;
+PREPROCESSOR_USE_EMPTY_DEFINE_OWN_LINE
+#if 1
+int use_empty_define_own_line_2 = 3;
+#endif"
+  (cl:progn (cl:defparameter use_empty_define_own_line_1 8))
+  (cl:progn (cl:defparameter use_empty_define_own_line_2 3)))
+

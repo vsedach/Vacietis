@@ -835,7 +835,11 @@
   (case c
     (#\# (read-c-macro %in c))
     (#\; (values))
-    (t   (%read-c-statement (read-c-exp c)))))
+    (t   (let ((expression (read-c-exp c)))
+           (if expression
+               (%read-c-statement expression)
+               ;; Allow for an empty macro on a line by itself.
+               (values))))))
 
 (defun read-c-identifier (c)
   ;; assume inverted readtable (need to fix for case-preserving lisps)
@@ -892,7 +896,13 @@
                             (funcall it (c-read-delimited-strings)))))
                         %in
                         (make-concatenated-stream *macro-stream* %in))
-                  (read-c-exp (next-char)))
+                  ;; Peek to next Newline.
+                  (if (let ((*readtable* (copy-readtable)))
+                        (set-syntax-from-char #\Newline #\a)
+                        (char-equal (peek-char t %in) #\Newline))
+                      ;; Macro on a line by itself.
+                      (values)
+                      (read-c-exp (next-char))))
                  ((gethash symbol (compiler-state-enums *compiler-state*))
                   it)
                  (t
