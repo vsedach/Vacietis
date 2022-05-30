@@ -133,6 +133,10 @@
 
 (deflibcpkg #:vacietis.libc.unistd.h)
 
+(deflibcpkg #:vacietis.libc.limits.h)
+
+(deflibcpkg #:vacietis.libc.float.h)
+
 (deflibcpkg #:vacietis.libc.stdarg.h
   (:export
    #:va_list
