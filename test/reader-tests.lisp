@@ -940,3 +940,13 @@ int use_empty_define_own_line_2 = 3;
   (cl:progn (cl:defparameter use_empty_define_own_line_1 8))
   (cl:progn (cl:defparameter use_empty_define_own_line_2 3)))
 
+(reader-test preprocessor-inline-comment
+  "#define _GL_FLOAT_EXPONENT_STRLEN_BOUND(min, max)  \\
+  (      -100 < (min) && (max) <     100 ? 3       \\
+   :    -1000 < (min) && (max) <    1000 ? 4       \\
+   :   -10000 < (min) && (max) <   10000 ? 5       \\
+   :  -100000 < (min) && (max) <  100000 ? 6       \\
+   : -1000000 < (min) && (max) < 1000000 ? 7       \\
+   : 8 /* not a tight bound */)
+int preprocessor_inline_comment = 1;"
+  (cl:progn (cl:defparameter preprocessor_inline_comment 1)))

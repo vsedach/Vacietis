@@ -77,15 +77,21 @@
   `(loop with c do (setf c (c-read-char))
         ,@body))
 
-(defun next-char (&optional (eof-error? t))
-  "Returns the next character, skipping over whitespace and comments"
-  (loop-reading
-     while (case c
-             ((nil)                     (when eof-error?
-                                          (read-error "Unexpected end of file")))
-             (#\/                       (%maybe-read-comment))
-             ((#\Space #\Newline #\Tab #\\) t))
-     finally (return c)))
+(defun next-char (&optional (eof-error? t)
+                    (skip-space-tab? t) (skip-newlines? t))
+  "Returns the next character, skipping over comments"
+  (let ((backslash-seen nil))
+    (loop-reading
+      while (case c
+              ((nil)           (when eof-error?
+                                 (read-error "Unexpected end of file")))
+              ((#\/)           (%maybe-read-comment))
+              ((#\Space #\Tab) skip-space-tab?)
+              ((#\\)           (setf backslash-seen t))
+              ((#\Newline)     (if backslash-seen
+                                   (progn (setf backslash-seen nil) t)
+                                   skip-newlines?)))
+      finally (return c))))
 
 (defun make-buffer (&optional (element-type t))
   (make-array 10 :adjustable t :fill-pointer 0 :element-type element-type))
@@ -97,6 +103,13 @@
        do (unless (or (char= c #\\) (char= c #\Newline))
             (vector-push-extend c string-buffer))
        finally (when c (c-unread-char c)))
+    string-buffer))
+
+(defun pp-read-line ()
+  (let ((string-buffer (make-buffer 'character)))
+    (loop with c do (setf c (next-char nil nil nil))
+          while (and c (not (char-equal c #\Newline)))
+          do (vector-push-extend c string-buffer))
     string-buffer))
 
 (defun %maybe-read-comment ()
@@ -203,25 +216,6 @@
 
 (defvar preprocessor-if-stack ())
 (defvar *preprocessing* nil)
-
-(defun pp-read-line ()
-  (let (comment-follows?)
-   (prog1
-       (slurp-while (let (backslash-seen)
-                      (lambda (c)
-                        (case c
-                          (#\Newline
-                           (when backslash-seen
-                             (setf backslash-seen nil)
-                             t))
-                          (#\\ (setf backslash-seen t))
-                          (#\/ (if (find (peek-char nil %in nil nil) "/*")
-                                   (progn (setf comment-follows? t) nil)
-                                   t))
-                          (t t)))))
-     (c-read-char)
-     (when comment-follows?
-       (%maybe-read-comment)))))
 
 (defmacro lookup-define ()
   `(gethash (read-c-identifier (next-char))
