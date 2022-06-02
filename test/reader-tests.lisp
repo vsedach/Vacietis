@@ -855,6 +855,13 @@ int preprocessor_macro_with_concatenation = MACRO_WITH_CONCATENATION(test);"
 int preprocessor_double_concatenation = DOUBLE_CONCATENATION(test);"
   (cl:progn (cl:defparameter preprocessor_double_concatenation 4)))
 
+;; Macro with double concatenation argument trim.
+(reader-test preprocessor-double-concatenation-trim
+  "#define __test__ 4
+#define DOUBLE_CONCATENATION_TRIM(argument) __##argument##__
+int double_concatenation_trim = DOUBLE_CONCATENATION_TRIM ( test );"
+  (cl:progn (cl:defparameter double_concatenation_trim 4)))
+
 ;; Preprocessor #elif.
 (reader-test preprocessor-elif
   "#if 0

@@ -894,7 +894,7 @@
                            (string
                             it)
                            (function
-                            (funcall it (c-read-delimited-strings)))))
+                            (funcall it (c-read-delimited-strings t)))))
                         %in
                         (make-concatenated-stream *macro-stream* %in))
                   ;; Peek to next Newline.
