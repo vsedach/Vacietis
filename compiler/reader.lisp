@@ -978,7 +978,11 @@
 (defun %load-c-file (*c-file* *compiler-state*)
   (let ((*readtable*   c-readtable)
         (*line-number* 1))
-    (load *c-file*)))
+    (prog1 (load *c-file*)
+      (when *load-verbose*
+        #+sbcl (let ((sb-fasl::*load-depth* (1+ sb-fasl::*load-depth*)))
+                 (sb-fasl::load-fresh-line))
+        (format t "done    ~s~%" *c-file*)))))
 
 (defun load-c-file (file &key include-paths)
   (%load-c-file file (make-compiler-state :include-paths include-paths)))
