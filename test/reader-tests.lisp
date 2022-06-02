@@ -950,3 +950,9 @@ int use_empty_define_own_line_2 = 3;
    : 8 /* not a tight bound */)
 int preprocessor_inline_comment = 1;"
   (cl:progn (cl:defparameter preprocessor_inline_comment 1)))
+
+(reader-test preprocessor-character-backslash
+  "#if ('\\\\' == 92)
+int preprocessor_character_backslash = 1;
+#endif"
+  (cl:progn (cl:defparameter preprocessor_character_backslash 1)))

@@ -77,6 +77,11 @@
   `(loop with c do (setf c (c-read-char))
         ,@body))
 
+(defun at-end-of-line ()
+  (let ((*readtable* (copy-readtable)))
+    (set-syntax-from-char #\Newline #\a)
+    (char-equal (peek-char t %in) #\Newline)))
+
 (defun next-char (&optional (eof-error? t)
                     (skip-space-tab? t) (skip-newlines? t))
   "Returns the next character, skipping over comments"
@@ -87,7 +92,9 @@
                                  (read-error "Unexpected end of file")))
               ((#\/)           (%maybe-read-comment))
               ((#\Space #\Tab) skip-space-tab?)
-              ((#\\)           (setf backslash-seen t))
+              ((#\\)           (if (at-end-of-line)
+                                   (setf backslash-seen t)
+                                   nil))
               ((#\Newline)     (if backslash-seen
                                    (progn (setf backslash-seen nil) t)
                                    skip-newlines?)))
@@ -891,9 +898,7 @@
                         %in
                         (make-concatenated-stream *macro-stream* %in))
                   ;; Peek to next Newline.
-                  (if (let ((*readtable* (copy-readtable)))
-                        (set-syntax-from-char #\Newline #\a)
-                        (char-equal (peek-char t %in) #\Newline))
+                  (if (at-end-of-line)
                       ;; Macro on a line by itself.
                       (values)
                       (read-c-exp (next-char))))
