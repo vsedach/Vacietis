@@ -263,7 +263,12 @@
       (not (eql 0 (eval `(symbol-macrolet
                              ,(let ((x))
                                 (maphash (lambda (k v)
-                                           (push (list k v) x))
+                                           ;; Do not use special
+                                           ;; variables -- e.g., as
+                                           ;; set by (define EXIT_SUCCESS 0)
+                                           ;; -- in this symbol-macrolet.
+                                           (unless k
+                                             (push (list k v) x)))
                                          (compiler-state-pp *compiler-state*))
                                 x)
                            ,exp)))))))
