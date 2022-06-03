@@ -29,6 +29,7 @@
     ((find type *basic-c-types*) 1)
     ((enum-type-p   type)        1)
     ((pointer-to-p  type)        1)
+    ((and (listp type) (eq 'string-to-char* (car type))) (length (second type)))
     ((struct-type-p type)        (reduce #'+ (map 'list #'type-size
                                                   (struct-type-slots type))))
     ((array-type-p type)         (if (array-type-dimensions type)

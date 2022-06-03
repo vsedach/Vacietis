@@ -963,3 +963,7 @@ int preprocessor_inline_comment = 1;"
 int preprocessor_character_backslash = 1;
 #endif"
   (cl:progn (cl:defparameter preprocessor_character_backslash 1)))
+
+(reader-test sizeof-string
+  "char format[sizeof \"%-+ 0*.*Lg\"];"
+  (cl:progn (cl:defparameter format (vacietis:allocate-memory 10))))
